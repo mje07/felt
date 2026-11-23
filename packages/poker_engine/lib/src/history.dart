@@ -27,7 +27,7 @@ class HandHistory {
       heroSeat: heroSeat,
       heroNet: hero.inHand ? hero.stack - startStack : 0,
       events: [for (final e in s.log) e.toJson()],
-      summary: _summary(s),
+      summary: _summary(s, heroSeat),
       heroHole: hero.inHand ? List.of(hero.hole) : null,
       reviews: reviews,
     );
@@ -77,12 +77,14 @@ class HandHistory {
       HandHistory.fromJson((jsonDecode(s) as Map).cast<String, Object?>());
 }
 
-String _summary(HandState s) {
+String _summary(HandState s, int heroSeat) {
   final winners = <int, int>{};
   for (final a in s.awards) {
     for (final e in a.shares.entries) {
       winners[e.key] = (winners[e.key] ?? 0) + e.value;
     }
   }
-  return [for (final e in winners.entries) '${s.seats[e.key].name} wins ${e.value}'].join(', ');
+  return [
+    for (final e in winners.entries) e.key == heroSeat ? 'You win ${e.value}' : '${s.seats[e.key].name} wins ${e.value}'
+  ].join(', ');
 }

@@ -10,6 +10,7 @@ import 'package:felt/app/history_store.dart';
 import 'package:felt/app/settings.dart';
 import 'package:felt/main.dart';
 import 'package:felt/app/theme.dart';
+import 'package:felt/screens/history_panel.dart';
 import 'package:felt/screens/panel_route.dart';
 import 'package:felt/screens/range_screen.dart';
 import 'package:felt/screens/settings_panel.dart';
@@ -18,6 +19,7 @@ import 'package:felt/screens/training_screen.dart';
 import 'package:felt/widgets/review_panel.dart';
 import 'package:felt/screens/table_screen.dart';
 import 'package:felt/widgets/charts.dart';
+import 'package:felt/widgets/controls.dart';
 import 'package:flutter/gestures.dart';
 import 'package:felt/widgets/action_bar.dart';
 import 'package:flutter/rendering.dart';
@@ -67,6 +69,7 @@ void main() {
   statsShots();
   coachShots();
   settingsShots();
+  historyShots();
   setUpAll(_loadFonts);
 
   for (final dark in [false, true]) {
@@ -231,7 +234,7 @@ void coachShots() {
       final history = _simulatedHistory(1500);
       await tester.pumpWidget(_themed(dark, RangeScreen(history: history, initialPosition: 'BTN')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(CupertinoSwitch));
+      await tester.tap(find.byType(FeltToggle));
       await tester.pumpAndSettle();
       await _snap(tester, 'ranges_$mode');
     });
@@ -306,6 +309,39 @@ void settingsShots() {
       await tester.tap(find.text('Reset…').first);
       await tester.pumpAndSettle();
       await _snap(tester, 'settings_confirm_$mode');
+    });
+  }
+}
+
+void historyShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+    testWidgets('history $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      final history = _simulatedHistory(60);
+      await tester.pumpWidget(_themed(
+        dark,
+        Builder(
+          builder: (context) => CupertinoPageScaffold(
+            backgroundColor: Palette.of(context).background,
+            child: Center(
+              child: CupertinoButton(
+                onPressed: () =>
+                    showPanel(context, title: 'History', width: 560, builder: (_) => HistoryPanel(store: history)),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      // Expand the most recent graded hand.
+      final graded = history.hands.reversed.firstWhere((h) => h.reviews.length >= 2);
+      await tester.tap(find.text('Hand #${graded.handNumber}'));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'history_$mode');
     });
   }
 }

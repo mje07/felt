@@ -6,6 +6,7 @@ import 'package:poker_engine/poker_engine.dart';
 import '../app/history_store.dart';
 import '../app/theme.dart';
 import '../widgets/charts.dart';
+import '../widgets/controls.dart';
 
 /// Chart entries shown in the sidebar.
 class _Entry {
@@ -127,7 +128,8 @@ class _RangeScreenState extends State<RangeScreen> {
                                       if (entry.isOpen) ...[
                                         Text('Compare with my play', style: Typo.callout(p.secondaryLabel)),
                                         const SizedBox(width: Space.s),
-                                        CupertinoSwitch(
+                                        FeltToggle(
+                                          label: 'Compare with my play',
                                           value: _compare,
                                           onChanged: hasData ? (v) => setState(() => _compare = v) : null,
                                         ),

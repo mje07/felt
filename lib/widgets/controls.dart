@@ -103,10 +103,13 @@ class ChoiceChips<T> extends StatelessWidget {
 
 /// A titled group of settings, styled like the app's other cards.
 class SettingsCard extends StatelessWidget {
-  const SettingsCard({super.key, required this.title, required this.icon, required this.children});
+  const SettingsCard({super.key, required this.title, required this.icon, required this.children, this.color});
   final String title;
   final IconData icon;
   final List<Widget> children;
+
+  /// Background; defaults to a subtle tint for use inside panels.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +122,7 @@ class SettingsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(Space.l, Space.l, Space.l, Space.l),
       decoration: BoxDecoration(
-        color: p.isDark ? const Color(0xFF242426) : const Color(0xFFF7F7F9),
+        color: color ?? (p.isDark ? const Color(0xFF242426) : const Color(0xFFF7F7F9)),
         borderRadius: BorderRadius.circular(Radii.l),
         border: Border.all(color: p.separator, width: 0.5),
       ),
@@ -294,4 +297,34 @@ class _RightHalf extends CustomClipper<Rect> {
   Rect getClip(Size size) => Rect.fromLTWH(size.width / 2, 0, size.width / 2, size.height);
   @override
   bool shouldReclip(_RightHalf oldClipper) => false;
+}
+
+/// Single-line text input in Felt's style (tinted, rounded, no iOS chrome).
+class FeltTextField extends StatelessWidget {
+  const FeltTextField({super.key, required this.controller, this.placeholder, this.maxLength, this.width = 200});
+  final TextEditingController controller;
+  final String? placeholder;
+  final int? maxLength;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return SizedBox(
+      width: width,
+      child: CupertinoTextField(
+        controller: controller,
+        placeholder: placeholder,
+        maxLength: maxLength,
+        style: Typo.body(p.label),
+        placeholderStyle: Typo.body(p.tertiaryLabel),
+        cursorColor: p.accent,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: p.isDark ? const Color(0x1AFFFFFF) : const Color(0x0D000000),
+          borderRadius: BorderRadius.circular(Radii.m),
+        ),
+      ),
+    );
+  }
 }

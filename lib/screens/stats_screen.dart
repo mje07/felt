@@ -5,6 +5,7 @@ import '../app/history_store.dart';
 import '../app/theme.dart';
 import '../app/drill_progress.dart';
 import '../widgets/charts.dart';
+import '../widgets/controls.dart';
 import '../widgets/review_panel.dart';
 import 'range_screen.dart';
 import 'training_screen.dart';
@@ -58,10 +59,10 @@ class _StatsScreenState extends State<StatsScreen> {
                     ]),
                   ),
                   const Spacer(),
-                  CupertinoSlidingSegmentedControl<StatsRange>(
-                    groupValue: _range,
-                    children: {for (final r in StatsRange.values) r: Text(r.label)},
-                    onValueChanged: (v) => setState(() => _range = v ?? StatsRange.all),
+                  ChoiceChips<StatsRange>(
+                    value: _range,
+                    options: {for (final r in StatsRange.values) r: r.label},
+                    onChanged: (v) => setState(() => _range = v),
                   ),
                 ],
               ),

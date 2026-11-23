@@ -6,6 +6,7 @@ import '../app/history_store.dart';
 import '../app/settings.dart';
 import '../app/theme.dart';
 import '../widgets/common.dart';
+import '../widgets/controls.dart';
 import '../widgets/playing_card.dart';
 import 'history_panel.dart';
 import 'panel_route.dart';
@@ -16,6 +17,21 @@ import 'training_screen.dart';
 import 'table_screen.dart';
 
 const _stakes = [(1, 2), (5, 10), (25, 50), (100, 200)];
+
+const _styleBlurb = {
+  'mixed': 'A table of different styles: the most realistic game.',
+  'rock': 'Plays very few hands and rarely bluffs.',
+  'tag': 'Tight and aggressive: selective, then hard to push around.',
+  'lag': 'Plays lots of hands and keeps the pressure on.',
+  'station': 'Calls far too much. Value bet them relentlessly.',
+  'maniac': 'Bets and raises with almost anything.',
+};
+
+const _skillBlurb = {
+  Difficulty.casual: 'Makes clear mistakes. Good for learning.',
+  Difficulty.standard: 'Solid fundamentals with the odd error.',
+  Difficulty.expert: 'Reads ranges carefully and rarely slips.',
+};
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.history});
@@ -129,73 +145,56 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                     const SizedBox(height: Space.xl),
-                    CupertinoListSection.insetGrouped(
-                      margin: EdgeInsets.zero,
+                    SettingsCard(
+                      title: 'New table',
+                      icon: CupertinoIcons.suit_spade_fill,
+                      color: p.surface,
                       children: [
-                        CupertinoListTile(
-                          title: const Text('Your name'),
-                          trailing: SizedBox(
-                            width: 180,
-                            child: CupertinoTextField(
-                              controller: _name,
-                              textAlign: TextAlign.end,
-                              maxLength: 16,
-                              decoration: null,
-                              placeholder: 'You',
-                            ),
+                        SettingRow(
+                          label: 'Your name',
+                          trailing: FeltTextField(controller: _name, placeholder: 'You', maxLength: 16),
+                        ),
+                        SettingRow(
+                          label: 'Players',
+                          detail: _seats == 2 ? 'Heads-up against one opponent' : 'You and ${_seats - 1} opponents',
+                          trailing: ChoiceChips<int>(
+                            value: _seats,
+                            options: {for (var n = 2; n <= 9; n++) n: '$n'},
+                            onChanged: (v) => setState(() => _seats = v),
                           ),
                         ),
-                        CupertinoListTile(
-                          title: const Text('Players'),
-                          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Text('$_seats', style: Typo.number(p.label, size: 15)),
-                            const SizedBox(width: Space.m),
-                            _Stepper(
-                              onMinus: _seats > 2 ? () => setState(() => _seats--) : null,
-                              onPlus: _seats < 9 ? () => setState(() => _seats++) : null,
-                            ),
-                          ]),
-                        ),
-                        _Field(
+                        SettingRow(
                           label: 'Stakes',
-                          child: CupertinoSlidingSegmentedControl<int>(
-                            groupValue: _stake,
-                            children: {
-                              for (var i = 0; i < _stakes.length; i++)
-                                i: Text('${_stakes[i].$1}/${_stakes[i].$2}'),
-                            },
-                            onValueChanged: (v) => setState(() => _stake = v ?? 1),
+                          detail: 'Buy-in ${formatChips(_stakes[_stake].$2 * 100)} · 100 big blinds',
+                          trailing: ChoiceChips<int>(
+                            value: _stake,
+                            options: {for (var i = 0; i < _stakes.length; i++) i: '${_stakes[i].$1}/${_stakes[i].$2}'},
+                            onChanged: (v) => setState(() => _stake = v),
                           ),
                         ),
-                        _Field(
+                        SettingRow(
                           label: 'Opponents',
-                          child: CupertinoSlidingSegmentedControl<String>(
-                            groupValue: _style,
-                            children: {
-                              'mixed': const Text('Mixed'),
-                              for (final s in Personality.all) s.id: Text(s.label),
-                            },
-                            onValueChanged: (v) => setState(() => _style = v ?? 'mixed'),
+                          detail: _styleBlurb[_style],
+                          below: ChoiceChips<String>(
+                            value: _style,
+                            options: {'mixed': 'Mixed', for (final s in Personality.all) s.id: s.label},
+                            onChanged: (v) => setState(() => _style = v),
                           ),
                         ),
-                        _Field(
+                        SettingRow(
                           label: 'Skill',
-                          child: CupertinoSlidingSegmentedControl<Difficulty>(
-                            groupValue: _difficulty,
-                            children: const {
-                              Difficulty.casual: Text('Casual'),
-                              Difficulty.standard: Text('Standard'),
-                              Difficulty.expert: Text('Expert'),
+                          detail: _skillBlurb[_difficulty],
+                          trailing: ChoiceChips<Difficulty>(
+                            value: _difficulty,
+                            options: const {
+                              Difficulty.casual: 'Casual',
+                              Difficulty.standard: 'Standard',
+                              Difficulty.expert: 'Expert',
                             },
-                            onValueChanged: (v) => setState(() => _difficulty = v ?? Difficulty.standard),
+                            onChanged: (v) => setState(() => _difficulty = v),
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: Space.s),
-                    Text(
-                      'Buy-in ${formatChips(_stakes[_stake].$2 * 100)} · 100 big blinds',
-                      style: Typo.callout(p.secondaryLabel),
                     ),
                     const SizedBox(height: Space.xl),
                     PillButton(
@@ -229,56 +228,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// A grouped-list row with the label above a full-width control.
-class _Field extends StatelessWidget {
-  const _Field({required this.label, required this.child});
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Palette.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(label, style: Typo.body(p.label)),
-          const SizedBox(height: Space.s),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _Stepper extends StatelessWidget {
-  const _Stepper({required this.onMinus, required this.onPlus});
-  final VoidCallback? onMinus, onPlus;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Palette.of(context);
-    Widget btn(IconData i, VoidCallback? f) => CupertinoButton(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          minimumSize: const Size(36, 28),
-          onPressed: f,
-          child: Icon(i, size: 16, color: f == null ? p.tertiaryLabel : p.label),
-        );
-    return Container(
-      decoration: BoxDecoration(
-        color: p.isDark ? const Color(0x33FFFFFF) : const Color(0x14000000),
-        borderRadius: BorderRadius.circular(Radii.s),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        btn(CupertinoIcons.minus, onMinus),
-        Container(width: 0.5, height: 18, color: p.separator),
-        btn(CupertinoIcons.plus, onPlus),
-      ]),
     );
   }
 }
