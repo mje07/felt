@@ -45,6 +45,9 @@ class Settings extends ChangeNotifier {
   bool soundEnabled = true;
   double volume = 0.8;
 
+  /// Show the coach's grade on each of your actions as you play.
+  bool showGradesLive = false;
+
   void _read() {
     final p = _prefs;
     if (p == null) return;
@@ -55,6 +58,7 @@ class Settings extends ChangeNotifier {
     reduceMotion = p.getBool('reduceMotion') ?? false;
     soundEnabled = p.getBool('sound') ?? true;
     volume = p.getDouble('volume') ?? 0.8;
+    showGradesLive = p.getBool('gradesLive') ?? false;
     playerName = p.getString('playerName') ?? 'You';
   }
 
@@ -69,6 +73,7 @@ class Settings extends ChangeNotifier {
       p.setBool('reduceMotion', reduceMotion);
       p.setBool('sound', soundEnabled);
       p.setDouble('volume', volume);
+      p.setBool('gradesLive', showGradesLive);
       p.setString('playerName', playerName);
     }
     notifyListeners();

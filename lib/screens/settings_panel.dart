@@ -106,6 +106,14 @@ class SettingsPanel extends StatelessWidget {
                   onChanged: (v) => s.update((s) => s.reduceMotion = v),
                 ),
               ),
+              CupertinoListTile(
+                title: const Text('Show coach grades while playing'),
+                subtitle: const Text('Off: grades appear after each hand'),
+                trailing: CupertinoSwitch(
+                  value: s.showGradesLive,
+                  onChanged: (v) => s.update((s) => s.showGradesLive = v),
+                ),
+              ),
             ],
           ),
           CupertinoListSection.insetGrouped(

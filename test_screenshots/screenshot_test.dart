@@ -9,7 +9,11 @@ import 'package:felt/app/controller.dart';
 import 'package:felt/app/history_store.dart';
 import 'package:felt/app/settings.dart';
 import 'package:felt/main.dart';
+import 'package:felt/app/theme.dart';
+import 'package:felt/screens/range_screen.dart';
 import 'package:felt/screens/stats_screen.dart';
+import 'package:felt/screens/training_screen.dart';
+import 'package:felt/widgets/review_panel.dart';
 import 'package:felt/screens/table_screen.dart';
 import 'package:felt/widgets/charts.dart';
 import 'package:flutter/gestures.dart';
@@ -59,6 +63,7 @@ Future<void> _snap(WidgetTester tester, String name) async {
 
 void main() {
   statsShots();
+  coachShots();
   setUpAll(_loadFonts);
 
   for (final dark in [false, true]) {
@@ -145,11 +150,18 @@ HistoryStore _simulatedHistory(int n) {
       if (players[i].stack < 500) game.rebuy(i, 1000 - players[i].stack);
     }
     var s = game.startNextHand();
+    final reviews = <DecisionReview>[];
     while (!s.isComplete) {
-      s = applyAction(s, players[s.toAct].bot!.decide(buildBotContext(s), rng));
+      final ctx = buildBotContext(s);
+      final a = players[s.toAct].bot!.decide(ctx, rng);
+      if (s.toAct == 0) {
+        final r = gradeDecision(analyzeDecision(ctx, samples: 300, rng: rng), a);
+        if (r != null) reviews.add(r);
+      }
+      s = applyAction(s, a);
     }
     game.settle(s);
-    store.hands.add(HandHistory.fromState(s, heroSeat: 0));
+    store.hands.add(HandHistory.fromState(s, heroSeat: 0, reviews: reviews));
   }
   return store;
 }
@@ -157,7 +169,7 @@ HistoryStore _simulatedHistory(int n) {
 void statsShots() {
   for (final dark in [false, true]) {
     testWidgets('stats ${dark ? 'dark' : 'light'}', (tester) async {
-      tester.view.physicalSize = const Size(1280, 2300);
+      tester.view.physicalSize = const Size(1280, 3000);
       tester.view.devicePixelRatio = 1;
       final settings = Settings.memory()..appearance = dark ? Appearance.dark : Appearance.light;
       final history = _simulatedHistory(800);
@@ -181,10 +193,84 @@ void statsShots() {
       // Hover a starting-hand cell and the bankroll line for the tooltip states.
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
-      await gesture.moveTo(tester.getCenter(find.byType(BankrollChart)) + const Offset(150, 0));
+      await gesture.moveTo(tester.getCenter(find.byType(BankrollChart).last) + const Offset(150, 0));
       await tester.pumpAndSettle();
       await _snap(tester, 'stats_${dark ? 'dark' : 'light'}');
       await gesture.removePointer();
+    });
+  }
+}
+
+Widget _themed(bool dark, Widget home) => RepaintBoundary(
+      key: const ValueKey('shot'),
+      child: SettingsScope(
+        settings: Settings.memory()..appearance = dark ? Appearance.dark : Appearance.light,
+        child: CupertinoApp(
+          debugShowCheckedModeBanner: false,
+          theme: CupertinoThemeData(
+            brightness: dark ? Brightness.dark : Brightness.light,
+            textTheme: const CupertinoTextThemeData(
+              textStyle: TextStyle(fontFamily: 'Inter', fontSize: 15, color: CupertinoColors.label),
+            ),
+          ),
+          home: home,
+        ),
+      ),
+    );
+
+void coachShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+
+    testWidgets('ranges $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 860);
+      tester.view.devicePixelRatio = 1;
+      final history = _simulatedHistory(1500);
+      await tester.pumpWidget(_themed(dark, RangeScreen(history: history, initialPosition: 'BTN')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(CupertinoSwitch));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'ranges_$mode');
+    });
+
+    testWidgets('training $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 860);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(_themed(dark, TrainingScreen(history: _simulatedHistory(300))));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'training_picker_$mode');
+      await tester.tap(find.text(DrillKind.outs.title));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+      await tester.pumpAndSettle();
+      await _snap(tester, 'training_question_$mode');
+    });
+
+    testWidgets('review $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      final history = _simulatedHistory(200);
+      final hand = history.hands.lastWhere((h) => h.reviews.length >= 3 && h.reviews.any((r) => r.grade != Grade.best));
+      await tester.pumpWidget(_themed(
+        dark,
+        Builder(
+          builder: (context) => CupertinoPageScaffold(
+            backgroundColor: Palette.of(context).background,
+            child: Center(
+              child: SizedBox(
+                width: 540,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  color: Palette.of(context).surface,
+                  child: SingleChildScrollView(child: HandReviewList(reviews: hand.reviews)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'review_$mode');
     });
   }
 }

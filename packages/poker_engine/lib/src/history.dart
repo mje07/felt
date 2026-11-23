@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'coach/review.dart';
 import 'game_state.dart';
 
 /// A finished hand, stored as its event log (enough to replay it).
@@ -12,9 +13,11 @@ class HandHistory {
     required this.events,
     required this.summary,
     this.heroHole,
+    this.reviews = const [],
   });
 
-  factory HandHistory.fromState(HandState s, {required int heroSeat, DateTime? at}) {
+  factory HandHistory.fromState(HandState s,
+      {required int heroSeat, DateTime? at, List<DecisionReview> reviews = const []}) {
     final start = s.log.whereType<HandStarted>().first;
     final startStack = (start.seats[heroSeat]['stack'] as int?) ?? 0;
     final hero = s.seats[heroSeat];
@@ -26,6 +29,7 @@ class HandHistory {
       events: [for (final e in s.log) e.toJson()],
       summary: _summary(s),
       heroHole: hero.inHand ? List.of(hero.hole) : null,
+      reviews: reviews,
     );
   }
 
@@ -37,6 +41,10 @@ class HandHistory {
         events: [for (final e in j['events'] as List) (e as Map).cast<String, Object?>()],
         summary: j['summary'] as String,
         heroHole: (j['hole'] as List?)?.cast<int>(),
+        reviews: [
+          for (final r in (j['reviews'] as List?) ?? const [])
+            DecisionReview.fromJson((r as Map).cast<String, Object?>()),
+        ],
       );
 
   final int handNumber;
@@ -50,6 +58,9 @@ class HandHistory {
   /// or if the hero sat the hand out).
   final List<int>? heroHole;
 
+  /// The coach's grades for the hero's decisions (empty for older records).
+  final List<DecisionReview> reviews;
+
   Map<String, Object?> toJson() => {
         'hand': handNumber,
         'at': playedAt.toIso8601String(),
@@ -58,6 +69,7 @@ class HandHistory {
         'events': events,
         'summary': summary,
         if (heroHole != null) 'hole': heroHole,
+        if (reviews.isNotEmpty) 'reviews': [for (final r in reviews) r.toJson()],
       };
 
   String encode() => jsonEncode(toJson());

@@ -3,6 +3,7 @@ import 'package:poker_engine/poker_engine.dart';
 
 import '../app/history_store.dart';
 import '../app/theme.dart';
+import '../widgets/review_panel.dart';
 
 /// Converts a stored event log into readable lines.
 List<String> describeHistory(HandHistory h) {
@@ -107,10 +108,17 @@ class _HistoryPanelState extends State<HistoryPanel> {
                                 padding: const EdgeInsets.symmetric(vertical: 1.5),
                                 child: Text(l, style: Typo.callout(p.secondaryLabel)),
                               ),
+                            if (h.reviews.isNotEmpty) ...[
+                              const SizedBox(height: Space.m),
+                              Text('COACH', style: Typo.caption(p.secondaryLabel).copyWith(letterSpacing: 0.8)),
+                              const SizedBox(height: Space.s),
+                              HandReviewList(reviews: h.reviews),
+                            ],
                           ],
                         ),
                       )
-                    : Text(h.summary, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    : Text(h.reviews.isEmpty ? h.summary : '${reviewSummary(h.reviews)} · ${h.summary}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: Text(
                   h.heroNet == 0 ? '—' : '${h.heroNet > 0 ? '+' : ''}${formatChips(h.heroNet)}',
                   style: Typo.number(h.heroNet > 0 ? p.positive : (h.heroNet < 0 ? p.destructive : p.tertiaryLabel),

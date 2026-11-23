@@ -4,7 +4,9 @@ import 'package:poker_engine/poker_engine.dart';
 import '../app/controller.dart';
 import '../app/settings.dart';
 import '../app/theme.dart';
+import '../screens/panel_route.dart';
 import 'common.dart';
+import 'review_panel.dart';
 
 /// Bet sizing presets as fractions of the pot (after calling).
 const sizingPresets = <(String, double)>[('½ Pot', 0.5), ('¾ Pot', 0.75), ('Pot', 1.0)];
@@ -94,16 +96,31 @@ class ActionBarState extends State<ActionBar> {
   }
 
   Widget _nextHand(BuildContext context) {
+    final reviews = c.lastHandReviews;
     return GlassPanel(
       key: const ValueKey('next'),
       radius: Radii.pill,
       padding: const EdgeInsets.all(6),
-      child: PillButton(
-        label: 'Deal Next Hand',
-        shortcut: 'Space',
-        style: PillStyle.filled,
-        minWidth: 220,
-        onPressed: c.dealNext,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (reviews.isNotEmpty) ...[
+            PillButton(
+              label: 'Review Hand',
+              sublabel: reviewSummary(reviews),
+              minWidth: 200,
+              onPressed: () => openHandReview(context, c),
+            ),
+            const SizedBox(width: 6),
+          ],
+          PillButton(
+            label: 'Deal Next Hand',
+            shortcut: 'Space',
+            style: PillStyle.filled,
+            minWidth: 220,
+            onPressed: c.dealNext,
+          ),
+        ],
       ),
     );
   }
@@ -221,5 +238,31 @@ class _Chip extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Shows the last hand's coach review; holds the next deal while open.
+Future<void> openHandReview(BuildContext context, GameController c) async {
+  c.holdNextHand = true;
+  final reviews = c.lastHandReviews;
+  try {
+    await showPanel<void>(
+      context,
+      title: 'Hand Review',
+      width: 540,
+      builder: (context) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(Space.xl, Space.xs, Space.xl, Space.xl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(reviewSummary(reviews), style: Typo.headline(Palette.of(context).secondaryLabel)),
+            const SizedBox(height: Space.l),
+            HandReviewList(reviews: reviews),
+          ],
+        ),
+      ),
+    );
+  } finally {
+    c.holdNextHand = false;
   }
 }

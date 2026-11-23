@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../game_state.dart';
 import '../rules.dart';
+import '../stats.dart' show positionOf;
 
 /// Everything a bot may know when deciding. Plain data (isolate-safe):
 /// it never exposes other players' hole cards.
@@ -22,6 +23,10 @@ class BotContext {
     required this.isPreflopAggressor,
     required this.opponentRanges,
     required this.streetRaises,
+    this.position = 'UTG',
+    this.openerPosition,
+    this.effectiveStackBb = 100,
+    this.opponentNames = const [],
   });
 
   final int seat;
@@ -43,6 +48,18 @@ class BotContext {
 
   /// Assumed range width (0..1) per live opponent.
   final List<double> opponentRanges;
+
+  /// Position label (UTG, MP, HJ, CO, BTN, SB, BB).
+  final String position;
+
+  /// Position of the first preflop raiser, if any.
+  final String? openerPosition;
+
+  /// Smaller of our stack and the biggest live opponent stack, in big blinds.
+  final double effectiveStackBb;
+
+  /// Live opponents' names, aligned with [opponentRanges].
+  final List<String> opponentNames;
 }
 
 abstract interface class Bot {
@@ -57,7 +74,7 @@ BotContext buildBotContext(HandState s) {
   final postflopAggression = <int, int>{};
   final calledPre = <int>{};
   var preflopRaises = 0, limpers = 0, streetRaises = 0;
-  var aggressor = -1;
+  var aggressor = -1, opener = -1;
   for (final e in s.log) {
     if (e is! PlayerActed) continue;
     final aggressive = e.type == ActionType.bet || e.type == ActionType.raise;
@@ -66,6 +83,7 @@ BotContext buildBotContext(HandState s) {
         preflopRaises++;
         raisedPre.add(e.seat);
         aggressor = e.seat;
+        if (opener < 0) opener = e.seat;
       } else if (e.type == ActionType.call) {
         calledPre.add(e.seat);
         if (preflopRaises == 0) limpers++;
@@ -97,6 +115,10 @@ BotContext buildBotContext(HandState s) {
   }
 
   final ranges = [for (final p in live) rangeFor(p)];
+  final active = [for (final p in s.seats) if (p.inHand) p.index];
+  final myTotal = me.stack + me.streetBet;
+  final biggestOther = live.fold(0, (m, p) => max(m, p.stack + p.streetBet));
+  final effective = min(myTotal, biggestOther);
 
   return BotContext(
     seat: me.index,
@@ -114,6 +136,12 @@ BotContext buildBotContext(HandState s) {
     isPreflopAggressor: aggressor == me.index,
     opponentRanges: ranges,
     streetRaises: streetRaises,
+    position: positionOf(seat: me.index, button: s.button, bbSeat: s.bigBlindSeat, active: active),
+    openerPosition: opener < 0
+        ? null
+        : positionOf(seat: opener, button: s.button, bbSeat: s.bigBlindSeat, active: active),
+    effectiveStackBb: effective / s.bigBlind,
+    opponentNames: [for (final p in live) p.name],
   );
 }
 

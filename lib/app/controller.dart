@@ -47,6 +47,9 @@ class SeatView {
   final String style;
   int stack = 0, bet = 0, cardsDealt = 0, won = 0;
   bool inHand = false, folded = false, allIn = false, revealed = false, winner = false;
+
+  /// Coach grade of this seat's latest decision (hero only).
+  Grade? grade;
   List<int> hole = const [];
   String? label;
   String? handLabel;
@@ -162,6 +165,19 @@ class GameController extends ChangeNotifier {
   TablePlayer get hero => game.seats[heroSeat]!;
   int get sessionNet => hero.stack - hero.buyIns;
 
+  // Coach.
+  final List<DecisionReview> _handReviews = [];
+
+  /// Grades for the most recent finished hand.
+  List<DecisionReview> lastHandReviews = const [];
+
+  /// Every grade this session (for the session accuracy readout).
+  final List<DecisionReview> sessionReviews = [];
+  double? get sessionAccuracy => accuracyOf(sessionReviews);
+
+  /// While true, the next hand is not dealt (e.g. the review panel is open).
+  bool holdNextHand = false;
+
   /// Total in the middle including live bets (for bet sizing).
   int get potWithBets => _state?.pot ?? 0;
 
@@ -236,12 +252,28 @@ class GameController extends ChangeNotifier {
       }
 
       var s = game.startNextHand();
+      _handReviews.clear();
+      lastHandReviews = const [];
       _state = s;
       await _play(s, s.log);
       while (!s.isComplete && !_disposed) {
         view.toAct = s.toAct;
         _notify();
-        final action = s.toAct == heroSeat ? await _askHero(s) : await _askBot(s);
+        final heroTurn = s.toAct == heroSeat;
+        final analysis = heroTurn ? _analyze(s) : null;
+        final action = heroTurn ? await _askHero(s) : await _askBot(s);
+        if (analysis != null && !_disposed) {
+          try {
+            final review = gradeDecision(await analysis, action);
+            if (review != null) {
+              _handReviews.add(review);
+              sessionReviews.add(review);
+              view.seats[heroSeat].grade = review.grade;
+            }
+          } catch (e) {
+            debugPrint('Coach analysis failed: $e');
+          }
+        }
         if (_disposed) return;
         HandState next;
         try {
@@ -257,7 +289,8 @@ class GameController extends ChangeNotifier {
       }
       if (_disposed) return;
       game.settle(s);
-      unawaited(history.add(HandHistory.fromState(s, heroSeat: heroSeat)));
+      lastHandReviews = List.unmodifiable(_handReviews);
+      unawaited(history.add(HandHistory.fromState(s, heroSeat: heroSeat, reviews: lastHandReviews)));
 
       handOver = true;
       _nextHand = Completer<void>();
@@ -269,6 +302,9 @@ class GameController extends ChangeNotifier {
         ]);
       } else {
         await _nextHand!.future;
+      }
+      while (holdNextHand && !_disposed) {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
       }
       handOver = false;
     }
@@ -298,6 +334,14 @@ class GameController extends ChangeNotifier {
   }
 
   /// Static so the closure captures only the bot and its context.
+  /// Coach analysis of the hero's spot (postflop runs Monte Carlo, so off the UI isolate).
+  Future<DecisionAnalysis> _analyze(HandState s) {
+    final ctx = buildBotContext(s);
+    if (ctx.street == Street.preflop) return Future.value(analyzeDecision(ctx));
+    if (!useIsolates) return Future.value(analyzeDecision(ctx, samples: 300, rng: _rng));
+    return Isolate.run(() => analyzeDecision(ctx, samples: 2000));
+  }
+
   static Future<PlayerAction> _decideInIsolate(HeuristicBot bot, BotContext ctx) =>
       Isolate.run(() => bot.decide(ctx, Random()));
 
@@ -328,7 +372,8 @@ class GameController extends ChangeNotifier {
               ..cardsDealt = 0
               ..hole = List.of(seat.hole)
               ..label = null
-              ..handLabel = null;
+              ..handLabel = null
+              ..grade = null;
           }
           _notify();
           await _wait(300);

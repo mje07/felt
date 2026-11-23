@@ -170,20 +170,29 @@ class _TopBar extends StatelessWidget {
             listenable: controller,
             builder: (context, _) {
               final net = controller.sessionNet;
-              return Padding(
-                padding: const EdgeInsets.only(right: Space.m),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('SESSION', style: Typo.caption(p.secondaryLabel).copyWith(letterSpacing: 0.8)),
-                    AnimatedCount(
-                      value: net,
-                      prefix: net > 0 ? '+' : '',
-                      style: Typo.number(net > 0 ? p.positive : (net < 0 ? p.destructive : p.label), size: 15),
+              final acc = controller.sessionAccuracy;
+              Widget readout(String label, Widget value) => Padding(
+                    padding: const EdgeInsets.only(right: Space.l),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(label, style: Typo.caption(p.secondaryLabel).copyWith(letterSpacing: 0.8)),
+                        value,
+                      ],
                     ),
-                  ],
+                  );
+              return Row(children: [
+                if (acc != null)
+                  readout('ACCURACY', Text('${acc.round()}%', style: Typo.number(p.label, size: 15))),
+                readout(
+                  'SESSION',
+                  AnimatedCount(
+                    value: net,
+                    prefix: net > 0 ? '+' : '',
+                    style: Typo.number(net > 0 ? p.positive : (net < 0 ? p.destructive : p.label), size: 15),
+                  ),
                 ),
-              );
+              ]);
             },
           ),
           IconPill(

@@ -7,6 +7,7 @@ import '../app/settings.dart';
 import '../app/theme.dart';
 import 'common.dart';
 import 'playing_card.dart';
+import 'review_panel.dart';
 
 /// Positions of everything on the table for a given size.
 class TableGeometry {
@@ -534,7 +535,15 @@ class HeroSeat extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: _plateH + 12 + cardH,
-            child: Center(child: _ActionTag(text: seat.label, winner: seat.winner)),
+            child: Center(
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                _ActionTag(text: seat.label, winner: seat.winner),
+                if (SettingsScope.of(context).showGradesLive && seat.grade != null && seat.label != null) ...[
+                  const SizedBox(width: 6),
+                  GradeBadge(grade: seat.grade!, compact: true),
+                ],
+              ]),
+            ),
           ),
           Center(
             child: Row(

@@ -10,7 +10,9 @@ import '../widgets/playing_card.dart';
 import 'history_panel.dart';
 import 'panel_route.dart';
 import 'settings_panel.dart';
+import 'range_screen.dart';
 import 'stats_screen.dart';
+import 'training_screen.dart';
 import 'table_screen.dart';
 
 const _stakes = [(1, 2), (5, 10), (25, 50), (100, 200)];
@@ -203,6 +205,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       height: 52,
                       onPressed: _sitDown,
                     ),
+                    const SizedBox(height: Space.m),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      PillButton(
+                        label: 'Training',
+                        style: PillStyle.plain,
+                        minWidth: 0,
+                        onPressed: () => Navigator.of(context)
+                            .push(CupertinoPageRoute<void>(builder: (_) => TrainingScreen(history: widget.history))),
+                      ),
+                      PillButton(
+                        label: 'Range Charts',
+                        style: PillStyle.plain,
+                        minWidth: 0,
+                        onPressed: () => Navigator.of(context)
+                            .push(CupertinoPageRoute<void>(builder: (_) => RangeScreen(history: widget.history))),
+                      ),
+                    ]),
                   ],
                 ),
               ),

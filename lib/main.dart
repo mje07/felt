@@ -1,5 +1,6 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 
+import 'app/drill_progress.dart';
 import 'app/history_store.dart';
 import 'app/settings.dart';
 import 'app/sounds.dart';
@@ -11,6 +12,7 @@ Future<void> main() async {
   final settings = await Settings.load();
   final history = await HistoryStore.open();
   final sounds = await SoloudSounds.start(settings);
+  await DrillProgress.load();
   runApp(FeltApp(settings: settings, history: history, sounds: sounds));
 }
 

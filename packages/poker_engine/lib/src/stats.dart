@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'bots/preflop_chart.dart';
+import 'coach/review.dart';
 import 'history.dart';
 
 /// Table positions, in action order (preflop) for display.
@@ -60,6 +61,20 @@ class PlayerStats {
   double get cbetPct => _r(cbet, cbetOpp);
   double get foldToCbetPct => _r(foldToCbet, foldToCbetOpp);
   double get sawFlopPct => _r(sawFlop, hands);
+
+  // Coach grades.
+  int decisions = 0, scoreSum = 0;
+  final Map<Grade, int> gradeCounts = {};
+  final Map<MistakeKind, int> mistakeCounts = {};
+
+  /// Accuracy (0..100) of each graded hand, in order.
+  final List<double> accuracyByHand = [];
+  double? get accuracy => decisions == 0 ? null : scoreSum / decisions;
+
+  /// Unopened-pot opportunities and hands played (raised or limped), per
+  /// position and grid index, for comparing against the opening charts.
+  final Map<String, List<int>> rfiDealt = {for (final p in ['UTG', 'MP', 'HJ', 'CO', 'BTN', 'SB']) p: List.filled(169, 0)};
+  final Map<String, List<int>> rfiPlayed = {for (final p in ['UTG', 'MP', 'HJ', 'CO', 'BTN', 'SB']) p: List.filled(169, 0)};
 }
 
 /// Position label for [seat] given the active seats of a hand.
@@ -106,7 +121,7 @@ PlayerStats computeStats(Iterable<HandHistory> histories) {
     st.bankrollBb.add(running);
 
     var raisesBefore = 0;
-    var heroActedPre = false, heroVpip = false, heroPfr = false;
+    var heroActedPre = false, heroVpip = false, heroPfr = false, heroUnopened = false;
     var preAggressor = -1;
     var heroFolded = false, heroSawFlop = false;
     var street = 'preflop';
@@ -131,6 +146,7 @@ PlayerStats computeStats(Iterable<HandHistory> histories) {
                 if (aggressive) st.threeBet++;
               }
               if (!heroActedPre && raisesBefore == 0 && type == 'call') st.limps++;
+              if (!heroActedPre && raisesBefore == 0) heroUnopened = true;
               heroActedPre = true;
               if (type == 'call' || aggressive) heroVpip = true;
               if (aggressive) heroPfr = true;
@@ -207,11 +223,24 @@ PlayerStats computeStats(Iterable<HandHistory> histories) {
     final showdown = h.events.any((e) => e['e'] == 'showdown' && (e['hands'] as Map).containsKey('$hero'));
     if (showdown && won > 0) st.wonAtShowdown++;
 
+    for (final r in h.reviews) {
+      st.decisions++;
+      st.scoreSum += r.grade.score;
+      st.gradeCounts[r.grade] = (st.gradeCounts[r.grade] ?? 0) + 1;
+      if (r.kind != null) st.mistakeCounts[r.kind!] = (st.mistakeCounts[r.kind!] ?? 0) + 1;
+    }
+    final handAccuracy = accuracyOf(h.reviews);
+    if (handAccuracy != null) st.accuracyByHand.add(handAccuracy);
+
     final hole = h.heroHole;
     if (hole != null && hole.length == 2) {
       final i = startingHandIndex(hole[0], hole[1]);
       st.handCount[i]++;
       st.handNetBb[i] += netBb;
+      if (heroUnopened && pos != 'BB' && st.rfiDealt.containsKey(pos)) {
+        st.rfiDealt[pos]![i]++;
+        if (heroVpip) st.rfiPlayed[pos]![i]++;
+      }
     }
   }
   return st;

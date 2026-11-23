@@ -3,7 +3,11 @@ import 'package:poker_engine/poker_engine.dart';
 
 import '../app/history_store.dart';
 import '../app/theme.dart';
+import '../app/drill_progress.dart';
 import '../widgets/charts.dart';
+import '../widgets/review_panel.dart';
+import 'range_screen.dart';
+import 'training_screen.dart';
 
 enum StatsRange {
   last100('Last 100', 100),
@@ -70,7 +74,7 @@ class _StatsScreenState extends State<StatsScreen> {
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 1080),
-                          child: _Body(stats: stats, profile: profile),
+                          child: _Body(stats: stats, profile: profile, history: widget.history),
                         ),
                       ),
                     ),
@@ -102,9 +106,12 @@ class _Empty extends StatelessWidget {
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.stats, required this.profile});
+  const _Body({required this.stats, required this.profile, required this.history});
   final PlayerStats stats;
   final PlayerProfile? profile;
+  final HistoryStore history;
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +136,10 @@ class _Body extends StatelessWidget {
           pair(_ProfileCard(stats: stats, profile: profile), _StyleCard(profile: profile), fa: 3, fb: 2),
           const SizedBox(height: Space.l),
           _Tiles(stats: stats),
+          if (stats.decisions > 0) ...[
+            const SizedBox(height: Space.l),
+            _DecisionCard(stats: stats, history: history),
+          ],
           const SizedBox(height: Space.l),
           _Card(
             title: 'Results',
@@ -430,6 +441,115 @@ class _InsightsCard extends StatelessWidget {
                 ),
               ],
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DecisionCard extends StatelessWidget {
+  const _DecisionCard({required this.stats, required this.history});
+  final PlayerStats stats;
+  final HistoryStore history;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final acc = stats.accuracy!;
+    final total = stats.decisions;
+    final mistakes = stats.mistakeCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    // 20-hand rolling accuracy.
+    final rolling = <double>[];
+    final a = stats.accuracyByHand;
+    for (var i = 0; i < a.length; i++) {
+      final from = i < 19 ? 0 : i - 19;
+      final window = a.sublist(from, i + 1);
+      rolling.add(window.reduce((x, y) => x + y) / window.length);
+    }
+    return _Card(
+      title: 'Decision quality',
+      subtitle: 'How the coach graded $total decision${total == 1 ? '' : 's'}',
+      trailing: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text('${acc.round()}%', style: Typo.number(p.label, size: 28)),
+        Text('accuracy', style: Typo.caption(p.secondaryLabel)),
+      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Grade distribution: one whole split into parts, 2px gaps.
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: SizedBox(
+              height: 10,
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                for (final (i, g) in Grade.values.indexed)
+                  if ((stats.gradeCounts[g] ?? 0) > 0)
+                    Expanded(
+                      flex: stats.gradeCounts[g]!,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: i == 0 ? 0 : 2),
+                        child: ColoredBox(color: gradeStyle(g, p).$1),
+                      ),
+                    ),
+              ]),
+            ),
+          ),
+          const SizedBox(height: Space.m),
+          Wrap(spacing: Space.l, runSpacing: 6, children: [
+            for (final g in Grade.values)
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(gradeStyle(g, p).$2, size: 14, color: gradeStyle(g, p).$1),
+                const SizedBox(width: 4),
+                Text(g.label, style: Typo.callout(p.label)),
+                const SizedBox(width: 4),
+                Text('${stats.gradeCounts[g] ?? 0}', style: Typo.number(p.secondaryLabel, size: 12.5)),
+              ]),
+          ]),
+          if (rolling.length >= 10) ...[
+            const SizedBox(height: Space.xl),
+            Text('Accuracy over time (20-hand average)', style: Typo.callout(p.secondaryLabel)),
+            const SizedBox(height: Space.s),
+            BankrollChart(
+              values: rolling,
+              height: 160,
+              prependZero: false,
+              showDelta: false,
+              valueLabel: (v) => '${v.round()}% accuracy',
+              axisLabel: (v) => '${v.round()}%',
+            ),
+          ],
+          if (mistakes.isNotEmpty) ...[
+            const SizedBox(height: Space.xl),
+            Text('Recurring mistakes', style: Typo.headline(p.label)),
+            const SizedBox(height: Space.s),
+            for (final m in mistakes.take(3))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(children: [
+                  Expanded(
+                    child: Text.rich(TextSpan(children: [
+                      TextSpan(text: m.key.label, style: Typo.body(p.label)),
+                      TextSpan(text: '  ×${m.value}', style: Typo.number(p.secondaryLabel, size: 13)),
+                    ])),
+                  ),
+                  if (drillFor(m.key) == DrillKind.preflop)
+                    CupertinoButton(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(0, 30),
+                      onPressed: () => Navigator.of(context)
+                          .push(CupertinoPageRoute<void>(builder: (_) => RangeScreen(history: history))),
+                      child: Text('Range charts', style: Typo.callout(p.accent)),
+                    ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    minimumSize: const Size(0, 30),
+                    onPressed: () => Navigator.of(context).push(CupertinoPageRoute<void>(
+                        builder: (_) => TrainingScreen(history: history, startWith: drillFor(m.key)))),
+                    child: Text('Practise', style: Typo.callout(p.accent).copyWith(fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+              ),
           ],
         ],
       ),

@@ -1,10 +1,14 @@
+import 'dart:math';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:felt/app/controller.dart';
 import 'package:felt/app/history_store.dart';
 import 'package:felt/app/settings.dart';
 import 'package:felt/main.dart';
 import 'package:felt/screens/table_screen.dart';
+import 'package:felt/screens/training_screen.dart';
 import 'package:felt/widgets/action_bar.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_engine/poker_engine.dart';
 
@@ -40,11 +44,20 @@ void main() {
     ));
 
     var decisions = 0;
+    var sawReview = false;
     for (var i = 0; i < 4000 && history.hands.length < 4; i++) {
       await tester.pump(const Duration(milliseconds: 100));
       final rebuy = find.textContaining('Rebuy');
       if (rebuy.evaluate().isNotEmpty) await tester.tap(rebuy.first, warnIfMissed: false);
       // Prefer checking/calling so hands reach later streets.
+      final review = find.text('Review Hand');
+      if (!sawReview && review.evaluate().isNotEmpty) {
+        await tester.tap(review.first, warnIfMissed: false);
+        await tester.pumpAndSettle();
+        sawReview = find.text('Hand Review').evaluate().isNotEmpty;
+        await tester.tap(find.byIcon(CupertinoIcons.xmark_circle_fill), warnIfMissed: false);
+        await tester.pumpAndSettle();
+      }
       for (final label in ['Check', 'Call', 'Call All-in', 'Deal Next Hand']) {
         final f = find.descendant(of: find.byType(ActionBar), matching: find.text(label));
         if (f.evaluate().isNotEmpty) {
@@ -55,12 +68,34 @@ void main() {
       }
     }
     expect(history.hands.length, greaterThanOrEqualTo(4));
+    expect(history.hands.any((h) => h.reviews.isNotEmpty), isTrue, reason: 'the coach grades hero decisions');
+    expect(sawReview, isTrue, reason: 'the review panel opened');
     expect(decisions, greaterThan(0));
     expect(tester.takeException(), isNull);
 
     // Tear down and let pending timers drain.
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 10));
+  });
+
+  testWidgets('a drill session runs to the summary', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host(
+      Settings.memory(),
+      TrainingScreen(history: HistoryStore.memory(), startWith: DrillKind.potOdds, rng: Random(4)),
+    ));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 10; i++) {
+      expect(find.text('QUESTION ${i + 1} OF 10'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+      await tester.pumpAndSettle();
+      expect(find.textContaining(RegExp('Correct|Not quite')), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+    }
+    expect(find.textContaining('of 10 correct'), findsOneWidget);
   });
 
   test('preset sizing stays within the legal window', () {

@@ -27,3 +27,6 @@ double preflopEquity(int c1, int c2) =>
 /// 0.005 = AA (top half-percent), 1.0 = 72o.
 double preflopPercentile(int c1, int c2) =>
     preflopPercentileTable[startingHandIndex(c1, c2)];
+
+/// Percentile by grid index (see [preflopPercentile]).
+double preflopPercentileOf(int index) => preflopPercentileTable[index];

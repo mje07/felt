@@ -73,8 +73,22 @@ Widget positionedTooltip(Offset anchor, Size size, Widget tooltip, {double width
 
 /// Cumulative result in big blinds, hand by hand.
 class BankrollChart extends StatefulWidget {
-  const BankrollChart({super.key, required this.values, this.height = 220});
+  const BankrollChart({
+    super.key,
+    required this.values,
+    this.height = 220,
+    this.prependZero = true,
+    this.valueLabel = signedBb,
+    this.axisLabel,
+    this.showDelta = true,
+  });
   final List<double> values;
+
+  /// Start the line at 0 (cumulative series).
+  final bool prependZero;
+  final String Function(double) valueLabel;
+  final String Function(double)? axisLabel;
+  final bool showDelta;
   final double height;
 
   @override
@@ -89,7 +103,7 @@ class _BankrollChartState extends State<BankrollChart> {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     final cc = ChartColors.of(context);
-    final v = [0.0, ...widget.values];
+    final v = widget.prependZero ? [0.0, ...widget.values] : widget.values;
     return SizedBox(
       height: widget.height,
       child: LayoutBuilder(builder: (context, c) {
@@ -122,6 +136,7 @@ class _BankrollChartState extends State<BankrollChart> {
                   label: p.secondaryLabel,
                   surface: cc.surface,
                   hover: h,
+                  axisLabel: widget.axisLabel,
                 ),
               ),
               if (h != null)
@@ -129,8 +144,11 @@ class _BankrollChartState extends State<BankrollChart> {
                   Offset(xOf(h), yOf(v[h])),
                   size,
                   ChartTooltip(
-                    title: h == 0 ? 'Start' : 'After hand ${formatChips(h)}',
-                    lines: [signedBb(v[h]), if (h > 0) 'This hand ${signedBb(v[h] - v[h - 1])}'],
+                    title: widget.prependZero ? (h == 0 ? 'Start' : 'After hand ${formatChips(h)}') : 'Hand ${formatChips(h + 1)}',
+                    lines: [
+                      widget.valueLabel(v[h]),
+                      if (widget.showDelta && h > 0) 'This hand ${widget.valueLabel(v[h] - v[h - 1])}',
+                    ],
                   ),
                 ),
             ],
@@ -169,6 +187,7 @@ class _BankrollPainter extends CustomPainter {
     required this.label,
     required this.surface,
     required this.hover,
+    this.axisLabel,
   });
 
   final List<double> values;
@@ -177,6 +196,7 @@ class _BankrollPainter extends CustomPainter {
   final double Function(double) yOf;
   final Color line, grid, zero, label, surface;
   final int? hover;
+  final String Function(double)? axisLabel;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -191,7 +211,8 @@ class _BankrollPainter extends CustomPainter {
       final y = yOf(g);
       canvas.drawLine(Offset(52, y), Offset(size.width - 8, y), g.abs() < 1e-9 ? zeroPaint : gridPaint);
       final tp = TextPainter(
-          text: TextSpan(text: '${g > 0 ? '+' : ''}${g.round()}', style: style), textDirection: TextDirection.ltr)
+          text: TextSpan(text: axisLabel?.call(g) ?? '${g > 0 ? '+' : ''}${g.round()}', style: style),
+          textDirection: TextDirection.ltr)
         ..layout();
       tp.paint(canvas, Offset(44 - tp.width, y - tp.height / 2));
     }
