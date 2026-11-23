@@ -5,7 +5,10 @@ import '../app/history_store.dart';
 import '../app/settings.dart';
 import '../app/sounds.dart';
 import '../app/theme.dart';
+import '../widgets/common.dart';
+import '../widgets/controls.dart';
 import '../widgets/playing_card.dart';
+import 'panel_route.dart';
 
 class SettingsPanel extends StatelessWidget {
   const SettingsPanel({super.key, this.history});
@@ -18,48 +21,54 @@ class SettingsPanel extends StatelessWidget {
     final s = SettingsScope.of(context);
     final p = Palette.of(context);
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: Space.l),
+      padding: const EdgeInsets.fromLTRB(Space.xl, Space.s, Space.xl, Space.xl),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CupertinoListSection.insetGrouped(
-            header: const Text('APPEARANCE'),
+          SettingsCard(
+            title: 'Appearance',
+            icon: CupertinoIcons.circle_lefthalf_fill,
             children: [
-              CupertinoListTile(
-                title: const Text('Theme'),
-                trailing: CupertinoSlidingSegmentedControl<Appearance>(
-                  groupValue: s.appearance,
-                  children: const {
-                    Appearance.system: Text('Auto'),
-                    Appearance.light: Text('Light'),
-                    Appearance.dark: Text('Dark'),
-                  },
-                  onValueChanged: (v) => s.update((s) => s.appearance = v ?? Appearance.system),
-                ),
-              ),
-              CupertinoListTile(
-                title: const Text('Four-colour deck'),
-                subtitle: Row(
-                  children: [
-                    for (var suit = 0; suit < 4; suit++)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4, top: 2),
-                        child: SuitIcon(suit: suit, size: 12, color: suitColor(p, suit, s.fourColorDeck)),
-                      ),
-                  ],
-                ),
-                trailing: CupertinoSwitch(
-                  value: s.fourColorDeck,
-                  onChanged: (v) => s.update((s) => s.fourColorDeck = v),
-                ),
+              ThemeSwatches(value: s.appearance, onChanged: (v) => s.update((s) => s.appearance = v)),
+              SettingRow(
+                label: 'Four-colour deck',
+                detail: 'Blue diamonds and green clubs, so suits never blur together.',
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  // Suits shown on a card face, as they appear in play.
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: p.cardFace,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: p.separator, width: 0.5),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      for (var suit = 0; suit < 4; suit++)
+                        Padding(
+                          padding: EdgeInsets.only(right: suit == 3 ? 0 : 3),
+                          child: SuitIcon(suit: suit, size: 12, color: suitColor(p, suit, s.fourColorDeck)),
+                        ),
+                    ]),
+                  ),
+                  const SizedBox(width: Space.m),
+                  FeltToggle(
+                    label: 'Four-colour deck',
+                    value: s.fourColorDeck,
+                    onChanged: (v) => s.update((s) => s.fourColorDeck = v),
+                  ),
+                ]),
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('SOUND'),
+          const SizedBox(height: Space.l),
+          SettingsCard(
+            title: 'Sound',
+            icon: CupertinoIcons.speaker_2_fill,
             children: [
-              CupertinoListTile(
-                title: const Text('Sound effects'),
-                trailing: CupertinoSwitch(
+              SettingRow(
+                label: 'Sound effects',
+                trailing: FeltToggle(
+                  label: 'Sound effects',
                   value: s.soundEnabled,
                   onChanged: (v) {
                     s.update((s) => s.soundEnabled = v);
@@ -67,78 +76,95 @@ class SettingsPanel extends StatelessWidget {
                   },
                 ),
               ),
-              CupertinoListTile(
-                title: const Text('Volume'),
+              SettingRow(
+                label: 'Volume',
+                enabled: s.soundEnabled,
                 trailing: SizedBox(
                   width: 200,
                   child: Row(children: [
-                    Icon(CupertinoIcons.speaker_fill, size: 14, color: p.tertiaryLabel),
+                    Icon(CupertinoIcons.speaker_fill, size: 13, color: p.tertiaryLabel),
                     Expanded(
                       child: CupertinoSlider(
                         value: s.volume,
+                        activeColor: p.accent,
                         onChanged: s.soundEnabled ? (v) => s.update((s) => s.volume = v) : null,
                         onChangeEnd: (_) => SoundsScope.of(context).play(Sfx.chip),
                       ),
                     ),
-                    Icon(CupertinoIcons.speaker_3_fill, size: 14, color: p.tertiaryLabel),
+                    Icon(CupertinoIcons.speaker_3_fill, size: 13, color: p.tertiaryLabel),
                   ]),
                 ),
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('GAMEPLAY'),
+          const SizedBox(height: Space.l),
+          SettingsCard(
+            title: 'Gameplay',
+            icon: CupertinoIcons.suit_spade_fill,
             children: [
-              CupertinoListTile(
-                title: const Text('Speed'),
-                trailing: CupertinoSlidingSegmentedControl<GameSpeed>(
-                  groupValue: s.speed,
-                  children: {for (final g in GameSpeed.values) g: Text(g.label)},
-                  onValueChanged: (v) => s.update((s) => s.speed = v ?? GameSpeed.normal),
+              SettingRow(
+                label: 'Speed',
+                detail: 'How quickly cards, chips and opponents move.',
+                trailing: ChoiceChips<GameSpeed>(
+                  value: s.speed,
+                  options: {for (final g in GameSpeed.values) g: g.label},
+                  onChanged: (v) => s.update((s) => s.speed = v),
                 ),
               ),
-              CupertinoListTile(
-                title: const Text('Deal next hand automatically'),
-                trailing: CupertinoSwitch(
+              SettingRow(
+                label: 'Deal next hand automatically',
+                trailing: FeltToggle(
+                  label: 'Deal next hand automatically',
                   value: s.autoDeal,
                   onChanged: (v) => s.update((s) => s.autoDeal = v),
                 ),
               ),
-              CupertinoListTile(
-                title: const Text('Reduce motion'),
-                trailing: CupertinoSwitch(
+              SettingRow(
+                label: 'Reduce motion',
+                detail: 'Shorter, simpler animations.',
+                trailing: FeltToggle(
+                  label: 'Reduce motion',
                   value: s.reduceMotion,
                   onChanged: (v) => s.update((s) => s.reduceMotion = v),
                 ),
               ),
-              CupertinoListTile(
-                title: const Text('Show coach at the table'),
-                subtitle: const Text('Accuracy and hand reviews. Your stats are recorded either way.'),
-                trailing: CupertinoSwitch(
+            ],
+          ),
+          const SizedBox(height: Space.l),
+          SettingsCard(
+            title: 'Coach',
+            icon: CupertinoIcons.lightbulb_fill,
+            children: [
+              SettingRow(
+                label: 'Show coach at the table',
+                detail: 'Accuracy and hand reviews. Your stats are recorded either way.',
+                trailing: FeltToggle(
+                  label: 'Show coach at the table',
                   value: s.showCoachAtTable,
                   onChanged: (v) => s.update((s) => s.showCoachAtTable = v),
                 ),
               ),
-              CupertinoListTile(
-                title: const Text('Grade each action live'),
-                subtitle: const Text('Show a grade badge on every decision as you make it'),
-                trailing: CupertinoSwitch(
+              SettingRow(
+                label: 'Grade each action live',
+                detail: 'A grade badge on every decision as you make it.',
+                enabled: s.showCoachAtTable,
+                trailing: FeltToggle(
+                  label: 'Grade each action live',
                   value: s.showGradesLive,
                   onChanged: s.showCoachAtTable ? (v) => s.update((s) => s.showGradesLive = v) : null,
                 ),
               ),
             ],
           ),
-          if (history != null) _DataSection(history: history!),
-          CupertinoListSection.insetGrouped(
-            header: const Text('KEYBOARD'),
-            children: const [
-              _Key('Fold', 'F'),
-              _Key('Check / Call', 'C'),
-              _Key('Bet / Raise', 'R'),
-              _Key('Adjust bet', '↑ ↓'),
-              _Key('Deal next hand', 'Space'),
-            ],
+          if (history != null) ...[
+            const SizedBox(height: Space.l),
+            _DataCard(history: history!),
+          ],
+          const SizedBox(height: Space.l),
+          const SettingsCard(
+            title: 'Keyboard',
+            icon: CupertinoIcons.keyboard,
+            children: [_Shortcuts()],
           ),
         ],
       ),
@@ -146,68 +172,63 @@ class SettingsPanel extends StatelessWidget {
   }
 }
 
-class _Key extends StatelessWidget {
-  const _Key(this.label, this.key_);
-  final String label, key_;
+class _Shortcuts extends StatelessWidget {
+  const _Shortcuts();
+
+  static const _keys = [
+    ('Fold', ['F']),
+    ('Check / call', ['C']),
+    ('Bet / raise', ['R']),
+    ('Change bet size', ['↑', '↓']),
+    ('Deal next hand', ['Space']),
+    ('Answer a drill', ['1', '…', '5']),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
-    return CupertinoListTile(
-      title: Text(label),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: p.separator),
-        ),
-        child: Text(key_, style: Typo.callout(p.secondaryLabel)),
-      ),
-    );
+    return LayoutBuilder(builder: (context, c) {
+      final w = (c.maxWidth - Space.l) / 2;
+      return Wrap(
+        spacing: Space.l,
+        runSpacing: Space.m,
+        children: [
+          for (final (label, keys) in _keys)
+            SizedBox(
+              width: w,
+              child: Row(children: [
+                Expanded(child: Text(label, style: Typo.callout(p.secondaryLabel))),
+                for (final k in keys) ...[
+                  const SizedBox(width: 4),
+                  k == '…' ? Text('–', style: Typo.callout(p.tertiaryLabel)) : KeyCap(k),
+                ],
+              ]),
+            ),
+        ],
+      );
+    });
   }
 }
 
-class _DataSection extends StatefulWidget {
-  const _DataSection({required this.history});
+class _DataCard extends StatefulWidget {
+  const _DataCard({required this.history});
   final HistoryStore history;
 
   @override
-  State<_DataSection> createState() => _DataSectionState();
+  State<_DataCard> createState() => _DataCardState();
 }
 
-class _DataSectionState extends State<_DataSection> {
+class _DataCardState extends State<_DataCard> {
   String? _done;
-
-  Future<bool> _confirm(String title, String message, String action) async {
-    final ok = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Padding(padding: const EdgeInsets.only(top: 6), child: Text(message)),
-        actions: [
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(action),
-          ),
-        ],
-      ),
-    );
-    return ok ?? false;
-  }
 
   Future<void> _resetHistory() async {
     final n = widget.history.hands.length;
-    final ok = await _confirm(
-      'Reset hand history?',
-      'This permanently deletes ${formatChips(n)} saved hand${n == 1 ? '' : 's'}, along with your statistics, '
-          'player profile, coach grades and charts. This can\'t be undone.',
-      'Reset',
+    final ok = await confirmAction(
+      context,
+      title: 'Reset hand history?',
+      message: 'This permanently deletes ${formatChips(n)} saved hand${n == 1 ? '' : 's'}, along with your '
+          'statistics, player profile, coach grades and charts. This can\'t be undone.',
+      action: 'Reset',
     );
     if (!ok) return;
     await widget.history.clear();
@@ -215,10 +236,11 @@ class _DataSectionState extends State<_DataSection> {
   }
 
   Future<void> _resetTraining() async {
-    final ok = await _confirm(
-      'Reset training progress?',
-      'This clears your drill accuracy and best streaks. This can\'t be undone.',
-      'Reset',
+    final ok = await confirmAction(
+      context,
+      title: 'Reset training progress?',
+      message: 'This clears your drill accuracy and best streaks. This can\'t be undone.',
+      action: 'Reset',
     );
     if (!ok) return;
     DrillProgress.current.reset();
@@ -230,27 +252,33 @@ class _DataSectionState extends State<_DataSection> {
     final p = Palette.of(context);
     final n = widget.history.hands.length;
     final answered = DrillProgress.current.records.values.fold(0, (a, r) => a + r.answered);
-    Widget resetRow(String title, String subtitle, bool enabled, VoidCallback onTap) => CupertinoListTile(
-          title: Text(title, style: TextStyle(color: enabled ? p.destructive : p.tertiaryLabel)),
-          subtitle: Text(subtitle),
-          onTap: enabled ? onTap : null,
+    Widget reset(VoidCallback? onTap) => PillButton(
+          label: 'Reset…',
+          style: PillStyle.destructive,
+          minWidth: 0,
+          height: 34,
+          onPressed: onTap,
         );
-    return CupertinoListSection.insetGrouped(
-      header: const Text('DATA'),
-      footer: _done == null ? null : Text(_done!),
+    return SettingsCard(
+      title: 'Data',
+      icon: CupertinoIcons.tray_full_fill,
       children: [
-        resetRow(
-          'Reset Hand History & Stats',
-          n == 0 ? 'No hands saved' : '${formatChips(n)} hand${n == 1 ? '' : 's'} saved',
-          n > 0,
-          _resetHistory,
+        SettingRow(
+          label: 'Hand history & stats',
+          detail: n == 0 ? 'No hands saved' : '${formatChips(n)} hand${n == 1 ? '' : 's'} saved',
+          trailing: reset(n > 0 ? _resetHistory : null),
         ),
-        resetRow(
-          'Reset Training Progress',
-          answered == 0 ? 'No drills answered yet' : '${formatChips(answered)} drill answers saved',
-          answered > 0,
-          _resetTraining,
+        SettingRow(
+          label: 'Training progress',
+          detail: answered == 0 ? 'No drills answered yet' : '${formatChips(answered)} drill answers saved',
+          trailing: reset(answered > 0 ? _resetTraining : null),
         ),
+        if (_done != null)
+          Row(children: [
+            Icon(CupertinoIcons.checkmark_alt, size: 14, color: p.positive),
+            const SizedBox(width: 6),
+            Text(_done!, style: Typo.callout(p.secondaryLabel)),
+          ]),
       ],
     );
   }

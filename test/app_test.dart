@@ -10,6 +10,7 @@ import 'package:felt/screens/settings_panel.dart';
 import 'package:felt/screens/table_screen.dart';
 import 'package:felt/screens/training_screen.dart';
 import 'package:felt/widgets/action_bar.dart';
+import 'package:felt/widgets/common.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_engine/poker_engine.dart';
@@ -57,7 +58,7 @@ void main() {
         await tester.tap(review.first, warnIfMissed: false);
         await tester.pumpAndSettle();
         sawReview = find.text('Hand Review').evaluate().isNotEmpty;
-        await tester.tap(find.byIcon(CupertinoIcons.xmark_circle_fill), warnIfMissed: false);
+        await tester.tap(find.byIcon(CupertinoIcons.xmark), warnIfMissed: false);
         await tester.pumpAndSettle();
       }
       for (final label in ['Check', 'Call', 'Call All-in', 'Deal Next Hand']) {
@@ -168,7 +169,7 @@ void main() {
     expect(find.text('3 hands saved'), findsOneWidget);
 
     // Cancel keeps everything.
-    await tester.tap(find.text('Reset Hand History & Stats'));
+    await tester.tap(find.text('Reset…').first);
     await tester.pumpAndSettle();
     expect(find.text('Reset hand history?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
@@ -176,16 +177,16 @@ void main() {
     expect(history.hands.length, 3);
 
     // Confirm clears.
-    await tester.tap(find.text('Reset Hand History & Stats'));
+    await tester.tap(find.text('Reset…').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, 'Reset'));
+    await tester.tap(find.widgetWithText(PillButton, 'Reset'));
     await tester.pumpAndSettle();
     expect(history.hands, isEmpty);
     expect(find.text('No hands saved'), findsOneWidget);
 
-    await tester.tap(find.text('Reset Training Progress'));
+    await tester.tap(find.text('Reset…').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, 'Reset'));
+    await tester.tap(find.widgetWithText(PillButton, 'Reset'));
     await tester.pumpAndSettle();
     expect(DrillProgress.current.records[DrillKind.outs]!.answered, 0);
     expect(find.text('No drills answered yet'), findsOneWidget);

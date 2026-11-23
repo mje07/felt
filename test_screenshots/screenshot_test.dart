@@ -10,7 +10,9 @@ import 'package:felt/app/history_store.dart';
 import 'package:felt/app/settings.dart';
 import 'package:felt/main.dart';
 import 'package:felt/app/theme.dart';
+import 'package:felt/screens/panel_route.dart';
 import 'package:felt/screens/range_screen.dart';
+import 'package:felt/screens/settings_panel.dart';
 import 'package:felt/screens/stats_screen.dart';
 import 'package:felt/screens/training_screen.dart';
 import 'package:felt/widgets/review_panel.dart';
@@ -64,6 +66,7 @@ Future<void> _snap(WidgetTester tester, String name) async {
 void main() {
   statsShots();
   coachShots();
+  settingsShots();
   setUpAll(_loadFonts);
 
   for (final dark in [false, true]) {
@@ -271,6 +274,38 @@ void coachShots() {
       ));
       await tester.pumpAndSettle();
       await _snap(tester, 'review_$mode');
+    });
+  }
+}
+
+void settingsShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+    testWidgets('settings $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1500);
+      tester.view.devicePixelRatio = 1;
+      final history = _simulatedHistory(120);
+      await tester.pumpWidget(_themed(
+        dark,
+        Builder(
+          builder: (context) => CupertinoPageScaffold(
+            backgroundColor: Palette.of(context).background,
+            child: Center(
+              child: CupertinoButton(
+                onPressed: () => showPanel(context,
+                    title: 'Settings', width: 540, builder: (_) => SettingsPanel(history: history)),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'settings_$mode');
+      await tester.tap(find.text('Reset…').first);
+      await tester.pumpAndSettle();
+      await _snap(tester, 'settings_confirm_$mode');
     });
   }
 }
