@@ -10,6 +10,7 @@ export 'src/pots.dart';
 export 'src/equity.dart';
 export 'src/cash_game.dart';
 export 'src/history.dart';
+export 'src/stats.dart';
 export 'src/bots/bot.dart';
 export 'src/bots/personality.dart';
 export 'src/bots/heuristic_bot.dart';

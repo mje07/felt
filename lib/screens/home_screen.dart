@@ -10,6 +10,7 @@ import '../widgets/playing_card.dart';
 import 'history_panel.dart';
 import 'panel_route.dart';
 import 'settings_panel.dart';
+import 'stats_screen.dart';
 import 'table_screen.dart';
 
 const _stakes = [(1, 2), (5, 10), (25, 50), (100, 200)];
@@ -83,6 +84,14 @@ class _HomeScreenState extends State<HomeScreen> {
             top: Space.l,
             right: Space.l,
             child: Row(children: [
+              IconPill(
+                icon: CupertinoIcons.chart_bar_alt_fill,
+                tooltip: 'Statistics',
+                onPressed: () => Navigator.of(context)
+                    .push(CupertinoPageRoute<void>(builder: (_) => StatsScreen(history: widget.history)))
+                    .then((_) => setState(() {})),
+              ),
+              const SizedBox(width: Space.s),
               IconPill(
                 icon: CupertinoIcons.clock,
                 tooltip: 'Hand history',

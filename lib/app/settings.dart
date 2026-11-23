@@ -42,6 +42,8 @@ class Settings extends ChangeNotifier {
   bool autoDeal = true;
   bool reduceMotion = false;
   String playerName = 'You';
+  bool soundEnabled = true;
+  double volume = 0.8;
 
   void _read() {
     final p = _prefs;
@@ -51,6 +53,8 @@ class Settings extends ChangeNotifier {
     speed = GameSpeed.values.elementAtOrNull(p.getInt('speed') ?? 1) ?? GameSpeed.normal;
     autoDeal = p.getBool('autoDeal') ?? true;
     reduceMotion = p.getBool('reduceMotion') ?? false;
+    soundEnabled = p.getBool('sound') ?? true;
+    volume = p.getDouble('volume') ?? 0.8;
     playerName = p.getString('playerName') ?? 'You';
   }
 
@@ -63,6 +67,8 @@ class Settings extends ChangeNotifier {
       p.setInt('speed', speed.index);
       p.setBool('autoDeal', autoDeal);
       p.setBool('reduceMotion', reduceMotion);
+      p.setBool('sound', soundEnabled);
+      p.setDouble('volume', volume);
       p.setString('playerName', playerName);
     }
     notifyListeners();

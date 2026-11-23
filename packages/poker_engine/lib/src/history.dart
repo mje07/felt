@@ -11,19 +11,21 @@ class HandHistory {
     required this.heroNet,
     required this.events,
     required this.summary,
+    this.heroHole,
   });
 
   factory HandHistory.fromState(HandState s, {required int heroSeat, DateTime? at}) {
     final start = s.log.whereType<HandStarted>().first;
     final startStack = (start.seats[heroSeat]['stack'] as int?) ?? 0;
-    final endStack = s.seats[heroSeat].stack;
+    final hero = s.seats[heroSeat];
     return HandHistory(
       handNumber: s.handNumber,
       playedAt: at ?? DateTime.now(),
       heroSeat: heroSeat,
-      heroNet: s.seats[heroSeat].inHand ? endStack - startStack : 0,
+      heroNet: hero.inHand ? hero.stack - startStack : 0,
       events: [for (final e in s.log) e.toJson()],
       summary: _summary(s),
+      heroHole: hero.inHand ? List.of(hero.hole) : null,
     );
   }
 
@@ -34,6 +36,7 @@ class HandHistory {
         heroNet: j['net'] as int,
         events: [for (final e in j['events'] as List) (e as Map).cast<String, Object?>()],
         summary: j['summary'] as String,
+        heroHole: (j['hole'] as List?)?.cast<int>(),
       );
 
   final int handNumber;
@@ -43,6 +46,10 @@ class HandHistory {
   final List<Map<String, Object?>> events;
   final String summary;
 
+  /// The hero's hole cards (null for records made before this was stored,
+  /// or if the hero sat the hand out).
+  final List<int>? heroHole;
+
   Map<String, Object?> toJson() => {
         'hand': handNumber,
         'at': playedAt.toIso8601String(),
@@ -50,6 +57,7 @@ class HandHistory {
         'net': heroNet,
         'events': events,
         'summary': summary,
+        if (heroHole != null) 'hole': heroHole,
       };
 
   String encode() => jsonEncode(toJson());
@@ -64,8 +72,5 @@ String _summary(HandState s) {
       winners[e.key] = (winners[e.key] ?? 0) + e.value;
     }
   }
-  final parts = [
-    for (final e in winners.entries) '${s.seats[e.key].name} wins ${e.value}'
-  ];
-  return parts.join(', ');
+  return [for (final e in winners.entries) '${s.seats[e.key].name} wins ${e.value}'].join(', ');
 }

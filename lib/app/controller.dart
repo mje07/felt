@@ -7,6 +7,7 @@ import 'package:poker_engine/poker_engine.dart';
 
 import 'history_store.dart';
 import 'settings.dart';
+import 'sounds.dart';
 import 'theme.dart';
 
 /// Lobby choices for a new table.
@@ -98,6 +99,7 @@ class GameController extends ChangeNotifier {
     required this.config,
     required this.settings,
     required this.history,
+    this.sounds = Sounds.silent,
     Random? rng,
     this.useIsolates = true,
   }) : _rng = rng ?? Random.secure() {
@@ -135,6 +137,7 @@ class GameController extends ChangeNotifier {
   final TableConfig config;
   final Settings settings;
   final HistoryStore history;
+  final Sounds sounds;
   final bool useIsolates;
   final Random _rng;
 
@@ -273,6 +276,7 @@ class GameController extends ChangeNotifier {
 
   Future<PlayerAction> _askHero(HandState s) {
     heroLegal = legalActions(s);
+    sounds.play(Sfx.turn);
     _heroTurn = Completer<PlayerAction>();
     _notify();
     return _heroTurn!.future;
@@ -334,12 +338,14 @@ class GameController extends ChangeNotifier {
           sv.bet += e.amount;
           sv.allIn = sv.stack == 0;
           sv.label = e.isBig ? 'Big Blind' : 'Small Blind';
+          sounds.play(Sfx.chip);
           _notify();
           await _wait(160);
         case HoleCardsDealt():
           for (var round = 0; round < 2; round++) {
             for (final i in e.order) {
               view.seats[i].cardsDealt++;
+              sounds.play(Sfx.deal);
               _notify();
               await _wait(55);
             }
@@ -357,10 +363,16 @@ class GameController extends ChangeNotifier {
           sv.folded = e.type == ActionType.fold;
           sv.allIn = e.allIn;
           sv.label = _verb(e);
+          sounds.play(switch (e.type) {
+            ActionType.fold => Sfx.fold,
+            ActionType.check => Sfx.check,
+            _ => e.allIn ? Sfx.collect : Sfx.chip,
+          });
           _notify();
           await _wait(e.type == ActionType.fold ? 220 : 300);
         case UncalledReturned():
           final sv = view.seats[e.seat];
+          sounds.play(Sfx.chip);
           await _fly([(BetAnchor(e.seat), SeatAnchor(e.seat), e.amount)]);
           sv.bet -= e.amount;
           sv.stack += e.amount;
@@ -373,6 +385,7 @@ class GameController extends ChangeNotifier {
           }
           for (final c in e.cards) {
             view.board.add(c);
+            sounds.play(Sfx.flip);
             _updateHeroLabel();
             _notify();
             await _wait(e.cards.length > 1 ? 140 : 60);
@@ -384,6 +397,7 @@ class GameController extends ChangeNotifier {
             final sv = view.seats[entry.key];
             sv.revealed = true;
             sv.handLabel = describeHand(entry.value.$2);
+            if (!sv.isHuman) sounds.play(Sfx.flip);
             sv.label = null;
             _notify();
             await _wait(260);
@@ -408,6 +422,7 @@ class GameController extends ChangeNotifier {
             view.seats[w.key].stack += w.value;
           }
           view.headline = _headline(a);
+          if (a.shares.containsKey(heroSeat)) sounds.play(Sfx.win);
           _notify();
           await _wait(1100);
         case HandEnded():
@@ -429,6 +444,7 @@ class GameController extends ChangeNotifier {
     for (final sv in view.seats) {
       sv.bet = 0;
     }
+    sounds.play(Sfx.collect);
     await _fly(moving);
     view.pot += total;
     _notify();

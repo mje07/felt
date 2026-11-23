@@ -54,6 +54,7 @@ BotContext buildBotContext(HandState s) {
   final legal = legalActions(s);
   final me = s.seats[s.toAct];
   final raisedPre = <int>{};
+  final postflopAggression = <int, int>{};
   final calledPre = <int>{};
   var preflopRaises = 0, limpers = 0, streetRaises = 0;
   var aggressor = -1;
@@ -71,6 +72,9 @@ BotContext buildBotContext(HandState s) {
       }
     }
     if (e.street == s.street && aggressive) streetRaises++;
+    if (e.street != Street.preflop && aggressive) {
+      postflopAggression[e.seat] = (postflopAggression[e.seat] ?? 0) + 1;
+    }
   }
 
   final n = s.seats.length;
@@ -80,14 +84,19 @@ BotContext buildBotContext(HandState s) {
   final live = s.liveSeats.where((p) => p.index != me.index).toList();
   final playersAfter = live.where((p) => p.canAct && dist(p.index) > myDist).length;
 
-  final ranges = [
-    for (final p in live)
-      raisedPre.contains(p.index)
-          ? (preflopRaises >= 2 ? 0.1 : 0.22)
-          : calledPre.contains(p.index)
-              ? 0.5
-              : 1.0,
-  ];
+  // Preflop action sets a starting range; every postflop bet or raise
+  // narrows it further (people bet stronger hands).
+  double rangeFor(Seat p) {
+    final base = raisedPre.contains(p.index)
+        ? (preflopRaises >= 2 ? 0.1 : 0.22)
+        : calledPre.contains(p.index)
+            ? 0.5
+            : 1.0;
+    final n = postflopAggression[p.index] ?? 0;
+    return max(0.04, base * pow(0.55, n));
+  }
+
+  final ranges = [for (final p in live) rangeFor(p)];
 
   return BotContext(
     seat: me.index,

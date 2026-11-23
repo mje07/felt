@@ -12,6 +12,7 @@ Play a cash game against AI opponents with distinct styles. Built with Flutter, 
 | `lib/widgets/` | Vector playing cards, chips, seats, table geometry, action bar. |
 | `lib/screens/` | Lobby, table, settings and history panels. |
 | `test_screenshots/` | Renders the real UI to PNG for visual review. |
+| `tool/gen_sounds.dart` | Synthesizes the sound effects in `assets/sounds/` (procedural, so there are no sample licences). |
 
 ## Engine rules
 
@@ -21,6 +22,15 @@ Play a cash game against AI opponents with distinct styles. Built with Flutter, 
 - The uncalled part of a bet goes back to the bettor. When nobody can bet any more, the board runs out automatically.
 - Side pots are built in layers from each player's contribution. Folded chips stay in the pot, and odd chips go to the first winner left of the button.
 - Chips are conserved across every action (asserted in tests).
+
+## Statistics
+
+The engine's `computeStats` turns saved hand histories into the standard stats: VPIP, PFR, 3-bet, aggression factor, c-bet, fold to c-bet, WTSD, W$SD and WWSF. It also breaks your results down by position and by starting hand, and builds a running results line.
+`profileFor` places you on a tight/loose × passive/aggressive map, names your archetype (Nit, Rock, Shark, Maverick, Maniac or Calling Station) and writes coaching notes from your numbers.
+
+## Sound
+
+`tool/gen_sounds.dart` synthesizes the effects in `assets/sounds/`. They're procedural, so there are no sample licences to deal with. Playback goes through `flutter_soloud`, which bundles its own audio engine (miniaudio).
 
 ## Bots
 

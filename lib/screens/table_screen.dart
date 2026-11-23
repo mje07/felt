@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app/controller.dart';
 import '../app/history_store.dart';
 import '../app/settings.dart';
+import '../app/sounds.dart';
 import '../app/theme.dart';
 import '../widgets/action_bar.dart';
 import '../widgets/common.dart';
@@ -11,6 +12,7 @@ import '../widgets/table_view.dart';
 import 'history_panel.dart';
 import 'panel_route.dart';
 import 'settings_panel.dart';
+import 'stats_screen.dart';
 
 class TableScreen extends StatefulWidget {
   const TableScreen({
@@ -44,6 +46,7 @@ class _TableScreenState extends State<TableScreen> {
       settings: SettingsScope.of(context),
       history: widget.history,
       useIsolates: widget.useIsolates,
+      sounds: SoundsScope.of(context),
     )..start();
     widget.onController?.call(_controller!);
   }
@@ -183,6 +186,13 @@ class _TopBar extends StatelessWidget {
               );
             },
           ),
+          IconPill(
+            icon: CupertinoIcons.chart_bar_alt_fill,
+            tooltip: 'Statistics',
+            onPressed: () => Navigator.of(context)
+                .push(CupertinoPageRoute<void>(builder: (_) => StatsScreen(history: history))),
+          ),
+          const SizedBox(width: Space.s),
           IconPill(
             icon: CupertinoIcons.clock,
             tooltip: 'Hand history',

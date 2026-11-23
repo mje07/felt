@@ -41,7 +41,7 @@ class Personality {
 }
 
 enum Difficulty {
-  casual(samples: 250, noise: 0.12, rangeReading: false),
+  casual(samples: 250, noise: 0.12, rangeReading: true),
   standard(samples: 700, noise: 0.06, rangeReading: true),
   expert(samples: 1800, noise: 0.02, rangeReading: true);
 

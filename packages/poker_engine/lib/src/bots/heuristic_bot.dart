@@ -118,8 +118,10 @@ class HeuristicBot implements Bot {
       final to = l.currentBet + max<int>(l.minRaiseTo - l.currentBet, ((pot + l.callAmount) * 0.75).round());
       return raiseOrShove(ctx, to);
     }
-    final callNeed = potOdds - 0.12 * p.stickiness + 0.03;
-    if (eq >= callNeed || s >= potOdds + 0.05) {
+    // Earlier streets need a margin: more betting is still to come.
+    final streetMargin = switch (ctx.street) { Street.flop => 0.09, Street.turn => 0.05, _ => 0.01 };
+    final callNeed = potOdds - 0.12 * p.stickiness + streetMargin + 0.02 * ctx.streetRaises;
+    if (eq >= callNeed) {
       return const PlayerAction.call();
     }
     if (l.canRaise && ctx.opponents == 1 && !river && rng.nextDouble() < p.bluffing * 0.3) {

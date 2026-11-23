@@ -1,6 +1,7 @@
 // Renders the real UI to PNGs for visual review.
 // Run: flutter test test_screenshots --dart-define=OUT=<dir>
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -8,7 +9,10 @@ import 'package:felt/app/controller.dart';
 import 'package:felt/app/history_store.dart';
 import 'package:felt/app/settings.dart';
 import 'package:felt/main.dart';
+import 'package:felt/screens/stats_screen.dart';
 import 'package:felt/screens/table_screen.dart';
+import 'package:felt/widgets/charts.dart';
+import 'package:flutter/gestures.dart';
 import 'package:felt/widgets/action_bar.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -54,6 +58,7 @@ Future<void> _snap(WidgetTester tester, String name) async {
 }
 
 void main() {
+  statsShots();
   setUpAll(_loadFonts);
 
   for (final dark in [false, true]) {
@@ -82,7 +87,12 @@ void main() {
         child: SettingsScope(
           settings: settings,
           child: CupertinoApp(
-            theme: CupertinoThemeData(brightness: dark ? Brightness.dark : Brightness.light),
+            theme: CupertinoThemeData(
+              brightness: dark ? Brightness.dark : Brightness.light,
+              textTheme: const CupertinoTextThemeData(
+                textStyle: TextStyle(fontFamily: 'Inter', fontSize: 15, color: CupertinoColors.label),
+              ),
+            ),
             home: TableScreen(
               config: const TableConfig(seats: 6, difficulty: Difficulty.casual, style: 'station'),
               history: history,
@@ -117,6 +127,64 @@ void main() {
       }
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 10));
+    });
+  }
+}
+
+HistoryStore _simulatedHistory(int n) {
+  final store = HistoryStore.memory();
+  final rng = Random(11);
+  final players = [
+    TablePlayer(name: 'You', stack: 1000, personality: Personality.lag, difficulty: Difficulty.casual),
+    for (var i = 0; i < 5; i++)
+      TablePlayer(name: 'B$i', stack: 1000, personality: Personality.all[i], difficulty: Difficulty.casual),
+  ];
+  final game = CashGame(seats: players, smallBlind: 5, bigBlind: 10, rng: rng);
+  for (var h = 0; h < n; h++) {
+    for (var i = 0; i < players.length; i++) {
+      if (players[i].stack < 500) game.rebuy(i, 1000 - players[i].stack);
+    }
+    var s = game.startNextHand();
+    while (!s.isComplete) {
+      s = applyAction(s, players[s.toAct].bot!.decide(buildBotContext(s), rng));
+    }
+    game.settle(s);
+    store.hands.add(HandHistory.fromState(s, heroSeat: 0));
+  }
+  return store;
+}
+
+void statsShots() {
+  for (final dark in [false, true]) {
+    testWidgets('stats ${dark ? 'dark' : 'light'}', (tester) async {
+      tester.view.physicalSize = const Size(1280, 2300);
+      tester.view.devicePixelRatio = 1;
+      final settings = Settings.memory()..appearance = dark ? Appearance.dark : Appearance.light;
+      final history = _simulatedHistory(800);
+      await tester.pumpWidget(RepaintBoundary(
+        key: const ValueKey('shot'),
+        child: SettingsScope(
+          settings: settings,
+          child: CupertinoApp(
+            debugShowCheckedModeBanner: false,
+            theme: CupertinoThemeData(
+              brightness: dark ? Brightness.dark : Brightness.light,
+              textTheme: const CupertinoTextThemeData(
+                textStyle: TextStyle(fontFamily: 'Inter', fontSize: 15, color: CupertinoColors.label),
+              ),
+            ),
+            home: StatsScreen(history: history),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      // Hover a starting-hand cell and the bankroll line for the tooltip states.
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      await gesture.moveTo(tester.getCenter(find.byType(BankrollChart)) + const Offset(150, 0));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'stats_${dark ? 'dark' : 'light'}');
+      await gesture.removePointer();
     });
   }
 }

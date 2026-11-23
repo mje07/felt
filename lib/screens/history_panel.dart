@@ -18,11 +18,8 @@ List<String> describeHistory(HandHistory h) {
       case 'blind':
         lines.add('${names[e['seat']]} posts ${e['big'] == true ? 'big' : 'small'} blind ${e['amount']}');
       case 'deal':
-        final hero = h.events.firstWhere((x) => x['e'] == 'start')['seats'] as List;
-        final hole = (hero[h.heroSeat] as Map)['hole'];
-        if (hole is List && hole.length == 2) {
-          lines.add('Dealt to you: ${cardsToString(hole.cast<int>())}');
-        }
+        final hole = h.heroHole;
+        if (hole != null && hole.length == 2) lines.add('Dealt to you: ${cardsToString(hole)}');
       case 'act':
         final who = names[e['seat']];
         final type = e['type'];

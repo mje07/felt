@@ -1,6 +1,7 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 
 import '../app/settings.dart';
+import '../app/sounds.dart';
 import '../app/theme.dart';
 import '../widgets/playing_card.dart';
 
@@ -44,6 +45,38 @@ class SettingsPanel extends StatelessWidget {
                 trailing: CupertinoSwitch(
                   value: s.fourColorDeck,
                   onChanged: (v) => s.update((s) => s.fourColorDeck = v),
+                ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('SOUND'),
+            children: [
+              CupertinoListTile(
+                title: const Text('Sound effects'),
+                trailing: CupertinoSwitch(
+                  value: s.soundEnabled,
+                  onChanged: (v) {
+                    s.update((s) => s.soundEnabled = v);
+                    if (v) SoundsScope.of(context).play(Sfx.chip);
+                  },
+                ),
+              ),
+              CupertinoListTile(
+                title: const Text('Volume'),
+                trailing: SizedBox(
+                  width: 200,
+                  child: Row(children: [
+                    Icon(CupertinoIcons.speaker_fill, size: 14, color: p.tertiaryLabel),
+                    Expanded(
+                      child: CupertinoSlider(
+                        value: s.volume,
+                        onChanged: s.soundEnabled ? (v) => s.update((s) => s.volume = v) : null,
+                        onChangeEnd: (_) => SoundsScope.of(context).play(Sfx.chip),
+                      ),
+                    ),
+                    Icon(CupertinoIcons.speaker_3_fill, size: 14, color: p.tertiaryLabel),
+                  ]),
                 ),
               ),
             ],
