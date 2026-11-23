@@ -23,6 +23,17 @@ Play a cash game against AI opponents with distinct styles. Built with Flutter, 
 - Side pots are built in layers from each player's contribution. Folded chips stay in the pot, and odd chips go to the first winner left of the button.
 - Chips are conserved across every action (asserted in tests).
 
+## Sit & Go tournaments
+
+Single-table tournaments for 2–9 players with a buy-in and prizes, either winner-takes-all or the top places (65/35, or 50/30/20 with 7+ players). Blinds rise every 5, 8 or 12 hands (Hyper, Turbo or Regular), with big-blind antes from 100/200. Starting stacks are 1,000, 1,500 or 3,000.
+Players who bust in the same hand are placed by their stack at the start of that hand. When you're knocked out, the rest of the tournament is simulated in the background so the results screen can name the winner.
+
+**Bankroll:** one balance covers both modes. Tournament buy-ins and cash-game buy-ins and rebuys come out of it; prizes and cash-outs go back in. Chips left on a cash table are returned on the next launch if the app closes mid-session. When you're running low you can top back up to 10,000.
+
+**Tournament coaching:**
+- At 15 big blinds or fewer, unopened spots are graded against push/fold charts.
+- Calling an all-in is graded on chip outcomes in cash games and on prize equity (ICM, `icm.dart`) in tournaments. Near the bubble, a call that wins chips on average can still lose prize money, and the coach says so.
+
 ## Statistics
 
 The engine's `computeStats` turns saved hand histories into the standard stats: VPIP, PFR, 3-bet, aggression factor, c-bet, fold to c-bet, WTSD, W$SD and WWSF. It also breaks your results down by position and by starting hand, and builds a running results line.

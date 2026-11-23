@@ -1,8 +1,11 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:poker_engine/poker_engine.dart';
 
+import '../app/bankroll.dart';
+import '../app/controller.dart' show ordinal;
 import '../app/history_store.dart';
 import '../app/theme.dart';
+import '../app/tournament_store.dart';
 import '../app/drill_progress.dart';
 import '../widgets/charts.dart';
 import '../widgets/controls.dart';
@@ -20,6 +23,15 @@ enum StatsRange {
   final int? count;
 }
 
+enum StatsMode {
+  all('All games'),
+  cash('Cash'),
+  sng('Sit & Go');
+
+  const StatsMode(this.label);
+  final String label;
+}
+
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key, required this.history});
   final HistoryStore history;
@@ -30,11 +42,15 @@ class StatsScreen extends StatefulWidget {
 
 class _StatsScreenState extends State<StatsScreen> {
   StatsRange _range = StatsRange.all;
+  StatsMode _mode = StatsMode.all;
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
-    final all = widget.history.hands;
+    final all = [
+      for (final h in widget.history.hands)
+        if (_mode == StatsMode.all || (_mode == StatsMode.sng) == h.isTournament) h
+    ];
     final n = _range.count;
     final hands = n == null || all.length <= n ? all : all.sublist(all.length - n);
     final stats = computeStats(hands);
@@ -59,6 +75,12 @@ class _StatsScreenState extends State<StatsScreen> {
                     ]),
                   ),
                   const Spacer(),
+                  ChoiceChips<StatsMode>(
+                    value: _mode,
+                    options: {for (final m in StatsMode.values) m: m.label},
+                    onChanged: (v) => setState(() => _mode = v),
+                  ),
+                  const SizedBox(width: Space.l),
                   ChoiceChips<StatsRange>(
                     value: _range,
                     options: {for (final r in StatsRange.values) r: r.label},
@@ -69,13 +91,23 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
             Expanded(
               child: stats.hands == 0
-                  ? _Empty()
+                  ? (_mode != StatsMode.cash && TournamentStore.current.results.isNotEmpty
+                      ? SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xxl),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 1080),
+                              child: _TournamentsCard(results: TournamentStore.current.results),
+                            ),
+                          ),
+                        )
+                      : _Empty())
                   : SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xxl),
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 1080),
-                          child: _Body(stats: stats, profile: profile, history: widget.history),
+                          child: _Body(stats: stats, profile: profile, history: widget.history, mode: _mode),
                         ),
                       ),
                     ),
@@ -107,10 +139,12 @@ class _Empty extends StatelessWidget {
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.stats, required this.profile, required this.history});
+  const _Body({required this.stats, required this.profile, required this.history, required this.mode});
   final PlayerStats stats;
   final PlayerProfile? profile;
   final HistoryStore history;
+  final StatsMode mode;
+
 
 
 
@@ -162,6 +196,14 @@ class _Body extends StatelessWidget {
               child: StartingHandGrid(stats: stats),
             ),
           ),
+          if (mode != StatsMode.cash && TournamentStore.current.results.isNotEmpty) ...[
+            const SizedBox(height: Space.l),
+            _TournamentsCard(results: TournamentStore.current.results),
+          ],
+          if (mode == StatsMode.all && Bankroll.current.ledger.length >= 2) ...[
+            const SizedBox(height: Space.l),
+            _BankrollCard(bankroll: Bankroll.current),
+          ],
           if (profile != null) ...[
             const SizedBox(height: Space.l),
             _InsightsCard(insights: profile!.insights),
@@ -553,6 +595,116 @@ class _DecisionCard extends StatelessWidget {
               ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _TournamentsCard extends StatelessWidget {
+  const _TournamentsCard({required this.results});
+  final List<TournamentResult> results;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final n = results.length;
+    final wins = results.where((r) => r.place == 1).length;
+    final itm = results.where((r) => r.inTheMoney).length;
+    final spent = results.fold(0, (a, r) => a + r.buyIn);
+    final won = results.fold(0, (a, r) => a + r.prize);
+    final profit = won - spent;
+    final roi = spent == 0 ? 0.0 : profit / spent;
+    final avgFinish = results.fold(0, (a, r) => a + r.place) / n;
+    final maxPlace = results.map((r) => r.players).fold(2, (a, b) => a > b ? a : b);
+    final byPlace = List<int>.filled(maxPlace, 0);
+    for (final r in results) {
+      byPlace[r.place - 1]++;
+    }
+    final most = byPlace.fold(1, (a, b) => a > b ? a : b);
+    String pct(double v) => '${(v * 100).round()}%';
+
+    Widget figure(String label, String value, {Color? color}) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: Typo.caption(p.secondaryLabel)),
+            const SizedBox(height: 2),
+            Text(value, style: Typo.number(color ?? p.label, size: 20)),
+          ]),
+        );
+
+    return _Card(
+      title: 'Sit & Go results',
+      subtitle: '$n tournament${n == 1 ? '' : 's'} played',
+      trailing: Text('${profit >= 0 ? '+' : '−'}${formatChips(profit.abs())}',
+          style: Typo.number(profit >= 0 ? p.positive : p.destructive, size: 17)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            figure('Wins', '$wins'),
+            figure('In the money', pct(itm / n)),
+            figure('ROI', '${roi >= 0 ? '+' : '−'}${pct(roi.abs())}', color: roi >= 0 ? p.positive : p.destructive),
+            figure('Average finish', avgFinish.toStringAsFixed(1)),
+          ]),
+          const SizedBox(height: Space.xl),
+          Text('Finishing places', style: Typo.callout(p.secondaryLabel)),
+          const SizedBox(height: Space.m),
+          SizedBox(
+            height: 120,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var i = 0; i < maxPlace; i++)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (byPlace[i] > 0)
+                            Text('${byPlace[i]}', style: Typo.number(p.secondaryLabel, size: 11)),
+                          const SizedBox(height: 4),
+                          Container(
+                            height: byPlace[i] == 0 ? 2 : 80 * byPlace[i] / most,
+                            decoration: BoxDecoration(
+                              color: byPlace[i] == 0 ? p.separator : p.accent,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(ordinal(i + 1), style: Typo.caption(p.secondaryLabel)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BankrollCard extends StatelessWidget {
+  const _BankrollCard({required this.bankroll});
+  final Bankroll bankroll;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final values = [for (final e in bankroll.ledger) e.balance.toDouble()];
+    String compact(double v) => v.abs() >= 1000 ? '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k' : '${v.round()}';
+    return _Card(
+      title: 'Bankroll',
+      subtitle: 'Balance after every buy-in, prize and cash-out',
+      trailing: Text(formatChips(bankroll.balance), style: Typo.number(p.label, size: 17)),
+      child: BankrollChart(
+        values: values,
+        height: 180,
+        prependZero: false,
+        showDelta: true,
+        valueLabel: (v) => '${formatChips(v.round())} chips',
+        axisLabel: compact,
       ),
     );
   }

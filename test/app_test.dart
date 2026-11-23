@@ -1,10 +1,12 @@
 import 'dart:math';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:felt/app/bankroll.dart';
 import 'package:felt/app/controller.dart';
 import 'package:felt/app/drill_progress.dart';
 import 'package:felt/app/history_store.dart';
 import 'package:felt/app/settings.dart';
+import 'package:felt/app/tournament_store.dart';
 import 'package:felt/main.dart';
 import 'package:felt/screens/settings_panel.dart';
 import 'package:felt/screens/table_screen.dart';
@@ -184,12 +186,63 @@ void main() {
     expect(history.hands, isEmpty);
     expect(find.text('No hands saved'), findsOneWidget);
 
-    await tester.tap(find.text('Reset…').last);
+    await tester.tap(find.text('Reset…').at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(PillButton, 'Reset'));
     await tester.pumpAndSettle();
     expect(DrillProgress.current.records[DrillKind.outs]!.answered, 0);
     expect(find.text('No drills answered yet'), findsOneWidget);
+  });
+
+  testWidgets('a Sit & Go plays to the end and settles the bankroll', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final bankroll = Bankroll.memory(10000);
+    final results = TournamentStore.memory();
+    Bankroll.current = bankroll;
+    TournamentStore.current = results;
+    GameController? c;
+    await tester.pumpWidget(_host(
+      Settings.memory()..speed = GameSpeed.quick,
+      TableScreen(
+        config: const TableConfig(
+          mode: GameMode.sitAndGo,
+          seats: 3,
+          sngBuyIn: 100,
+          speed: BlindSpeed.hyper,
+          startingStack: StartingStack.short,
+          payoutStyle: PayoutStyle.standard,
+          difficulty: Difficulty.casual,
+        ),
+        history: HistoryStore.memory(),
+        useIsolates: false,
+        onController: (x) => c = x,
+      ),
+    ));
+    await tester.pump();
+    expect(bankroll.balance, 9900, reason: 'buy-in taken');
+    expect(find.textContaining('Sit & Go · Level 1'), findsOneWidget);
+
+    for (var i = 0; i < 20000 && c?.outcome == null; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      for (final label in ['Call', 'Call All-in', 'Check', 'Deal Next Hand']) {
+        final f = find.descendant(of: find.byType(ActionBar), matching: find.text(label));
+        if (f.evaluate().isNotEmpty) {
+          await tester.tap(f.first, warnIfMissed: false);
+          break;
+        }
+      }
+    }
+    final o = c!.outcome!;
+    await tester.pump();
+    expect(find.text(o.won ? 'You won the Sit & Go!' : 'You finished ${ordinal(o.place)} of 3'), findsOneWidget);
+    expect(o.prize, o.place == 1 ? 300 : 0, reason: '3 players: winner takes all');
+    expect(bankroll.balance, 9900 + o.prize);
+    expect(results.results.single.place, o.place);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 10));
   });
 
   testWidgets('a drill session runs to the summary', (tester) async {

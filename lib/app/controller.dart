@@ -548,6 +548,7 @@ class GameController extends ChangeNotifier {
 
   String get tournamentStatus {
     final t = tournament!;
+    if (t.isFinished || outcome != null) return 'Tournament over · ${t.startingPlayers} players';
     final untilNext = t.speed.handsPerLevel * (playingLevel + 1) - t.handNumber;
     final next = untilNext <= 0
         ? 'blinds up next hand'

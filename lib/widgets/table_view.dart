@@ -421,6 +421,25 @@ class BotSeat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = SettingsScope.of(context);
+    if (seat.outPlace != null) {
+      // Knocked out of a tournament: a faded plate with the finishing place.
+      return Opacity(
+        opacity: 0.4,
+        child: SizedBox(
+          width: 250,
+          height: _plateH,
+          child: Stack(clipBehavior: Clip.none, children: [
+            Center(child: _Nameplate(seat: seat, active: false, subtitle: seat.style)),
+            Positioned(
+              left: -70,
+              right: -70,
+              top: _plateH + 4,
+              child: Center(child: _ActionTag(text: 'Out · ${ordinal(seat.outPlace!)}')),
+            ),
+          ]),
+        ),
+      );
+    }
     if (!seat.inHand && seat.stack == 0) return const SizedBox.shrink();
     final active = view.toAct == seat.index;
     final showCards = seat.inHand && !seat.folded && seat.cardsDealt > 0;

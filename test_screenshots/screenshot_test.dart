@@ -5,9 +5,11 @@ import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:felt/app/bankroll.dart';
 import 'package:felt/app/controller.dart';
 import 'package:felt/app/history_store.dart';
 import 'package:felt/app/settings.dart';
+import 'package:felt/app/tournament_store.dart';
 import 'package:felt/main.dart';
 import 'package:felt/app/theme.dart';
 import 'package:felt/screens/history_panel.dart';
@@ -70,6 +72,7 @@ void main() {
   coachShots();
   settingsShots();
   historyShots();
+  sngShots();
   setUpAll(_loadFonts);
 
   for (final dark in [false, true]) {
@@ -342,6 +345,117 @@ void historyShots() {
       await tester.tap(find.text('Hand #${graded.handNumber}'));
       await tester.pumpAndSettle();
       await _snap(tester, 'history_$mode');
+    });
+  }
+}
+
+void sngShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+
+    testWidgets('sng lobby $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      Bankroll.current = Bankroll.memory(8400);
+      final settings = Settings.memory()..appearance = dark ? Appearance.dark : Appearance.light;
+      await tester.pumpWidget(RepaintBoundary(
+          key: const ValueKey('shot'), child: FeltApp(settings: settings, history: HistoryStore.memory())));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sit & Go'));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'sng_lobby_$mode');
+    });
+
+    testWidgets('sng table $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      Bankroll.current = Bankroll.memory(10000);
+      TournamentStore.current = TournamentStore.memory();
+      GameController? c;
+      await tester.pumpWidget(_themed(
+        dark,
+        TableScreen(
+          config: const TableConfig(
+            mode: GameMode.sitAndGo,
+            seats: 6,
+            sngBuyIn: 500,
+            speed: BlindSpeed.hyper,
+            startingStack: StartingStack.short,
+            style: 'maniac',
+            difficulty: Difficulty.casual,
+          ),
+          history: HistoryStore.memory(),
+          useIsolates: false,
+          onController: (x) => c = x,
+        ),
+      ));
+      var shotTable = false;
+      for (var i = 0; i < 20000 && c?.outcome == null; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        final ctl = c;
+        if (ctl == null) continue;
+        final someoneOut = ctl.view.seats.any((s) => s.outPlace != null && !s.isHuman);
+        if (!shotTable && someoneOut && ctl.heroLegal != null) {
+          await tester.pump(const Duration(milliseconds: 600));
+          await _snap(tester, 'sng_table_$mode');
+          shotTable = true;
+        }
+        if (ctl.heroLegal != null) {
+          // Fold most hands so the player survives a while, then call.
+          ctl.act(ctl.heroLegal!.canCheck
+              ? const PlayerAction.check()
+              : (shotTable ? const PlayerAction.call() : const PlayerAction.fold()));
+        }
+        if (ctl.handOver) ctl.dealNext();
+      }
+      await tester.pump(const Duration(milliseconds: 800));
+      await _snap(tester, 'sng_results_$mode');
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 10));
+    });
+
+    testWidgets('sng stats $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1100);
+      tester.view.devicePixelRatio = 1;
+      final rng = Random(8);
+      final store = TournamentStore.memory();
+      final bank = Bankroll.memory(10000);
+      for (var i = 0; i < 40; i++) {
+        final players = [6, 9][rng.nextInt(2)];
+        final place = 1 + rng.nextInt(players);
+        final prizes = prizesFor(PayoutStyle.standard, players, 500);
+        final prize = place <= prizes.length ? prizes[place - 1] : 0;
+        bank.debit(500);
+        if (prize > 0) bank.credit(prize);
+        store.results.add(TournamentResult(
+          at: DateTime(2026, 11, 1).add(Duration(hours: i)),
+          players: players,
+          buyIn: 500,
+          place: place,
+          prize: prize,
+          speed: BlindSpeed.turbo,
+          payoutStyle: PayoutStyle.standard,
+        ));
+      }
+      TournamentStore.current = store;
+      Bankroll.current = bank;
+      await tester.pumpWidget(_themed(dark, StatsScreen(history: _simulatedHistory(150))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sit & Go').first);
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(SingleChildScrollView).last, const Offset(0, -2000));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'sng_stats_$mode');
+    });
+
+    testWidgets('pushfold chart $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(_themed(dark, RangeScreen(history: HistoryStore.memory())));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Shove'));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'pushfold_$mode');
     });
   }
 }

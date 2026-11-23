@@ -50,7 +50,7 @@ double callWidth(String? shoverPosition, String heroPosition, int bucket, {bool 
 
 RangeChart shoveChart(String position, int bucket, {bool headsUp = false}) => RangeChart.sets(
       '${headsUp ? 'Heads-up' : position} shove · $bucket bb',
-      topFraction(shoveWidth(position, bucket, headsUp: headsUp)),
+      shoveRange(shoveWidth(position, bucket, headsUp: headsUp)),
     );
 
 RangeChart callShoveChart(String? shoverPosition, String heroPosition, int bucket, {bool headsUp = false}) =>
@@ -77,4 +77,15 @@ PreflopAdvice pushFoldAdvice({
   final played = chart.played;
   final edge = played.isEmpty ? 0.0 : played.map(preflopPercentileOf).reduce((a, b) => a > b ? a : b);
   return PreflopAdvice(chart.actionFor(handIndex), edge - preflopPercentileOf(handIndex), chart);
+}
+
+/// Shoving range for a width: the top [f] of hands by strength, plus pocket
+/// pairs, which shove well because they hold up when called. Wider ranges
+/// include smaller pairs (all pairs once ~20% of hands are shoved).
+Set<int> shoveRange(double f) {
+  final minPair = f >= 0.2 ? 0 : (f >= 0.12 ? 3 : (f >= 0.08 ? 4 : 13));
+  return {
+    ...topFraction(f),
+    for (var r = minPair; r < 13; r++) r * 13 + r,
+  };
 }

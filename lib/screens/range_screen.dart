@@ -10,10 +10,13 @@ import '../widgets/controls.dart';
 
 /// Chart entries shown in the sidebar.
 class _Entry {
-  const _Entry(this.section, this.label, this.position, this.scenario);
+  const _Entry(this.section, this.label, this.position, this.scenario, {this.pushFold});
   final String section, label, position;
   final PreflopScenario scenario;
-  bool get isOpen => scenario == PreflopScenario.unopened;
+
+  /// 'shove' or 'call' for the push/fold charts.
+  final String? pushFold;
+  bool get isOpen => scenario == PreflopScenario.unopened && pushFold == null;
   RangeChart get chart => chartFor(position, scenario);
 }
 
@@ -28,6 +31,8 @@ const _entries = [
   _Entry('Facing a raise', 'vs late raise', 'BTN', PreflopScenario.vsLateOpen),
   _Entry('Facing a raise', 'Big blind defence', 'BB', PreflopScenario.bbDefense),
   _Entry('Facing a raise', 'Facing a 3-bet', 'CO', PreflopScenario.vs3bet),
+  _Entry('Push / fold', 'Shove', 'BTN', PreflopScenario.unopened, pushFold: 'shove'),
+  _Entry('Push / fold', 'Call a shove', 'BB', PreflopScenario.unopened, pushFold: 'call'),
 ];
 
 /// Categorical slots 1 and 2 (blue, orange) from the validated palette.
@@ -46,6 +51,29 @@ class RangeScreen extends StatefulWidget {
 class _RangeScreenState extends State<RangeScreen> {
   late int _selected = math.max(0, _entries.indexWhere((e) => e.isOpen && e.position == widget.initialPosition));
   bool _compare = false;
+  int _pfStack = 10;
+  String _pfPosition = 'BTN';
+  String _pfShover = 'BTN';
+
+  Widget _pushFoldControls(String kind) => Wrap(spacing: Space.l, runSpacing: Space.s, children: [
+        ChoiceChips<int>(
+          value: _pfStack,
+          options: {for (final b in pushFoldStacks) b: '$b bb'},
+          onChanged: (v) => setState(() => _pfStack = v),
+        ),
+        if (kind == 'shove')
+          ChoiceChips<String>(
+            value: _pfPosition,
+            options: const {'UTG': 'UTG', 'MP': 'MP', 'HJ': 'HJ', 'CO': 'CO', 'BTN': 'BTN', 'SB': 'SB', 'HU': 'Heads-up'},
+            onChanged: (v) => setState(() => _pfPosition = v),
+          )
+        else
+          ChoiceChips<String>(
+            value: _pfShover,
+            options: const {'UTG': 'vs early', 'BTN': 'vs late', 'SB': 'BB vs SB', 'HU': 'Heads-up'},
+            onChanged: (v) => setState(() => _pfShover = v),
+          ),
+      ]);
   int? _hover;
   late final PlayerStats _stats = computeStats(widget.history.hands);
 
@@ -53,7 +81,13 @@ class _RangeScreenState extends State<RangeScreen> {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     final entry = _entries[_selected];
-    final chart = entry.chart;
+    final chart = switch (entry.pushFold) {
+      'shove' => shoveChart(_pfPosition, _pfStack, headsUp: _pfPosition == 'HU'),
+      'call' => callShoveChart(
+          _pfShover == 'HU' ? 'SB' : _pfShover, _pfShover == 'SB' || _pfShover == 'HU' ? 'BB' : 'BTN', _pfStack,
+          headsUp: _pfShover == 'HU'),
+      _ => entry.chart,
+    };
     final (raiseC, callC) = _actionColors(p);
     final dealt = entry.isOpen ? _stats.rfiDealt[entry.position] : null;
     final played = entry.isOpen ? _stats.rfiPlayed[entry.position] : null;
@@ -136,8 +170,12 @@ class _RangeScreenState extends State<RangeScreen> {
                                       ],
                                     ]),
                                     const SizedBox(height: Space.s),
+                                    if (entry.pushFold != null) ...[
+                                      _pushFoldControls(entry.pushFold!),
+                                      const SizedBox(height: Space.m),
+                                    ],
                                     Wrap(spacing: Space.l, runSpacing: 6, children: [
-                                      _Legend(color: raiseC, label: 'Raise', value: rangeFraction(chart.raise)),
+                                      _Legend(color: raiseC, label: entry.pushFold == 'shove' ? 'Shove' : 'Raise', value: rangeFraction(chart.raise)),
                                       if (chart.call.isNotEmpty)
                                         _Legend(color: callC, label: 'Call', value: rangeFraction(chart.call)),
                                       _Legend(

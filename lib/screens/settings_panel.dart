@@ -1,10 +1,12 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 
+import '../app/bankroll.dart';
 import '../app/drill_progress.dart';
 import '../app/history_store.dart';
 import '../app/settings.dart';
 import '../app/sounds.dart';
 import '../app/theme.dart';
+import '../app/tournament_store.dart';
 import '../widgets/common.dart';
 import '../widgets/controls.dart';
 import '../widgets/playing_card.dart';
@@ -235,6 +237,30 @@ class _DataCardState extends State<_DataCard> {
     if (mounted) setState(() => _done = 'Hand history and statistics were reset.');
   }
 
+  Future<void> _resetTournaments() async {
+    final ok = await confirmAction(
+      context,
+      title: 'Reset tournament results?',
+      message: "This deletes your Sit & Go finishes, ROI and winnings history. This can't be undone.",
+      action: 'Reset',
+    );
+    if (!ok) return;
+    await TournamentStore.current.clear();
+    if (mounted) setState(() => _done = 'Tournament results were reset.');
+  }
+
+  Future<void> _resetBankroll() async {
+    final ok = await confirmAction(
+      context,
+      title: 'Reset your bankroll?',
+      message: 'Your balance goes back to ${formatChips(Bankroll.startingBalance)} chips and its history is cleared.',
+      action: 'Reset',
+    );
+    if (!ok) return;
+    Bankroll.current.reset();
+    if (mounted) setState(() => _done = 'Bankroll was reset.');
+  }
+
   Future<void> _resetTraining() async {
     final ok = await confirmAction(
       context,
@@ -272,6 +298,18 @@ class _DataCardState extends State<_DataCard> {
           label: 'Training progress',
           detail: answered == 0 ? 'No drills answered yet' : '${formatChips(answered)} drill answers saved',
           trailing: reset(answered > 0 ? _resetTraining : null),
+        ),
+        SettingRow(
+          label: 'Tournament results',
+          detail: TournamentStore.current.results.isEmpty
+              ? 'No Sit & Gos played yet'
+              : '${TournamentStore.current.results.length} Sit & Go${TournamentStore.current.results.length == 1 ? '' : 's'} saved',
+          trailing: reset(TournamentStore.current.results.isEmpty ? null : _resetTournaments),
+        ),
+        SettingRow(
+          label: 'Bankroll',
+          detail: '${formatChips(Bankroll.current.balance)} chips · resets to ${formatChips(Bankroll.startingBalance)}',
+          trailing: reset(_resetBankroll),
         ),
         if (_done != null)
           Row(children: [
