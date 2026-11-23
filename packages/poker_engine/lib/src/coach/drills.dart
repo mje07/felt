@@ -5,6 +5,7 @@ import '../card.dart';
 import '../evaluator.dart';
 import 'notation.dart';
 import 'outs.dart';
+import 'pushfold.dart';
 import 'ranges.dart';
 
 enum DrillKind {
@@ -12,7 +13,8 @@ enum DrillKind {
   potOdds('Pot odds', 'How much equity do you need to call this bet?'),
   outs('Counting outs', 'How many cards complete your draw?'),
   equity('Equity sense', 'Estimate your share of the pot against a known hand.'),
-  showdown('Read the showdown', 'Who wins at the river, and with what?');
+  showdown('Read the showdown', 'Who wins at the river, and with what?'),
+  pushFold('Push or fold', 'Short-stack tournament spots: shove, call the shove, or fold.');
 
   const DrillKind(this.title, this.description);
   final String title, description;
@@ -53,6 +55,7 @@ Question generateQuestion(DrillKind kind, Random rng) => switch (kind) {
       DrillKind.outs => _outs(rng),
       DrillKind.equity => _equity(rng),
       DrillKind.showdown => _showdown(rng),
+      DrillKind.pushFold => _pushFold(rng),
     };
 
 String _pct(double v) => '${(v * 100).round()}%';
@@ -301,5 +304,57 @@ Question _showdown(Random rng) {
     answer: answer,
     explanation: 'You have ${describeHand(a)}; your opponent has ${describeHand(b)}.'
         '${a == b ? ' The best five cards are equal, so the pot is split.' : ''}',
+  );
+}
+
+// ---------------------------------------------------------------- push / fold
+
+Question _pushFold(Random rng) {
+  final bucket = pushFoldStacks[rng.nextInt(pushFoldStacks.length)];
+  final shoveSpot = rng.nextDouble() < 0.6;
+  RangeChart chart;
+  String situation;
+  List<String> choices;
+  if (shoveSpot) {
+    final pos = ['UTG', 'MP', 'HJ', 'CO', 'BTN', 'SB'][rng.nextInt(6)];
+    chart = shoveChart(pos, bucket);
+    situation = pos == 'SB'
+        ? 'You have $bucket big blinds in the small blind. It folds to you.'
+        : 'You have $bucket big blinds on the $pos. It folds to you.';
+    choices = const ['Fold', 'Shove'];
+  } else {
+    final (shover, hero) = [('UTG', 'BB'), ('HJ', 'BTN'), ('CO', 'BB'), ('BTN', 'BB'), ('SB', 'BB')][rng.nextInt(5)];
+    chart = callShoveChart(shover, hero, bucket);
+    situation = 'The $shover shoves for $bucket big blinds. '
+        "You're ${hero == 'BB' ? 'in the big blind' : 'on the $hero'} and cover them.";
+    choices = const ['Fold', 'Call'];
+  }
+  final played = chart.played;
+  final edge = played.map(preflopPercentileOf).fold(0.0, max);
+  int index;
+  if (rng.nextDouble() < 0.65) {
+    final near = [for (var i = 0; i < 169; i++) if ((preflopPercentileOf(i) - edge).abs() < 0.1) i];
+    index = near[rng.nextInt(near.length)];
+  } else {
+    var r = rng.nextInt(1326);
+    index = 0;
+    while (r >= combosAt(index)) {
+      r -= combosAt(index);
+      index++;
+    }
+  }
+  final inRange = played.contains(index);
+  final hand = startingHandName(index);
+  final width = _pct(rangeFraction(played));
+  return Question(
+    kind: DrillKind.pushFold,
+    prompt: shoveSpot ? 'Shove or fold?' : 'Call or fold?',
+    situation: situation,
+    hole: _cardsFor(index, rng),
+    choices: choices,
+    answer: inRange ? 1 : 0,
+    explanation: inRange
+        ? '$hand is inside the ${shoveSpot ? 'shoving' : 'calling'} range here (top $width of hands).'
+        : '$hand is outside the ${shoveSpot ? 'shoving' : 'calling'} range here (top $width of hands). Fold.',
   );
 }

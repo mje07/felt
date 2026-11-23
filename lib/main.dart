@@ -1,10 +1,12 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 
+import 'app/bankroll.dart';
 import 'app/drill_progress.dart';
 import 'app/history_store.dart';
 import 'app/settings.dart';
 import 'app/sounds.dart';
 import 'app/theme.dart';
+import 'app/tournament_store.dart';
 import 'screens/home_screen.dart';
 
 Future<void> main() async {
@@ -13,6 +15,8 @@ Future<void> main() async {
   final history = await HistoryStore.open();
   final sounds = await SoloudSounds.start(settings);
   await DrillProgress.load();
+  await Bankroll.load();
+  await TournamentStore.open();
   runApp(FeltApp(settings: settings, history: history, sounds: sounds));
 }
 

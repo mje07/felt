@@ -146,10 +146,14 @@ sealed class GameEvent {
 
 class HandStarted extends GameEvent {
   const HandStarted(this.handNumber, this.button, this.smallBlindSeat,
-      this.bigBlindSeat, this.smallBlind, this.bigBlind, this.seats);
+      this.bigBlindSeat, this.smallBlind, this.bigBlind, this.seats, {this.ante = 0});
   final int handNumber, button, smallBlindSeat, bigBlindSeat, smallBlind,
-      bigBlind;
+      bigBlind, ante;
   final List<Map<String, Object?>> seats;
+
+
+
+
   @override
   Map<String, Object?> toJson() => {
         'e': 'start',
@@ -159,6 +163,7 @@ class HandStarted extends GameEvent {
         'bbSeat': bigBlindSeat,
         'sb': smallBlind,
         'bb': bigBlind,
+        if (ante > 0) 'ante': ante,
         'seats': seats,
       };
 }
@@ -350,4 +355,12 @@ class HandState {
     }
     return b.toString();
   }
+}
+
+/// Big-blind ante: dead money posted by the big blind (tournaments).
+class AntePosted extends GameEvent {
+  const AntePosted(this.seat, this.amount);
+  final int seat, amount;
+  @override
+  Map<String, Object?> toJson() => {'e': 'ante', 'seat': seat, 'amount': amount};
 }

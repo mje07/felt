@@ -17,6 +17,7 @@ IconData drillIcon(DrillKind k) => switch (k) {
       DrillKind.outs => CupertinoIcons.number,
       DrillKind.equity => CupertinoIcons.chart_pie_fill,
       DrillKind.showdown => CupertinoIcons.eye_fill,
+      DrillKind.pushFold => CupertinoIcons.arrow_up_circle_fill,
     };
 
 class TrainingScreen extends StatefulWidget {

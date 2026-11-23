@@ -5,29 +5,79 @@ import 'dart:math';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:poker_engine/poker_engine.dart';
 
+import 'bankroll.dart';
 import 'history_store.dart';
 import 'settings.dart';
 import 'sounds.dart';
 import 'theme.dart';
+import 'tournament_store.dart';
+
+enum GameMode { cash, sitAndGo }
 
 /// Lobby choices for a new table.
 class TableConfig {
   const TableConfig({
+    this.mode = GameMode.cash,
     this.seats = 6,
     this.smallBlind = 5,
     this.bigBlind = 10,
     this.buyInBigBlinds = 100,
     this.style = 'mixed',
     this.difficulty = Difficulty.standard,
+    this.sngBuyIn = 500,
+    this.speed = BlindSpeed.turbo,
+    this.startingStack = StartingStack.standard,
+    this.payoutStyle = PayoutStyle.standard,
   });
 
+  final GameMode mode;
   final int seats, smallBlind, bigBlind, buyInBigBlinds;
 
   /// 'mixed' or a [Personality.id].
   final String style;
   final Difficulty difficulty;
 
+  // Sit & Go.
+  final int sngBuyIn;
+  final BlindSpeed speed;
+  final StartingStack startingStack;
+  final PayoutStyle payoutStyle;
+
+  bool get isTournament => mode == GameMode.sitAndGo;
+
+  /// Cash-game buy-in (100 big blinds).
   int get buyIn => bigBlind * buyInBigBlinds;
+
+  /// What sitting down costs from the bankroll.
+  int get entryCost => isTournament ? sngBuyIn : buyIn;
+}
+
+/// How a Sit & Go ended for the player.
+class TournamentOutcome {
+  const TournamentOutcome({
+    required this.place,
+    required this.players,
+    required this.prize,
+    required this.buyIn,
+    required this.winnerName,
+  });
+  final int place, players, prize, buyIn;
+  final String winnerName;
+  bool get won => place == 1;
+  bool get inTheMoney => prize > 0;
+}
+
+String ordinal(int n) {
+  final mod100 = n % 100;
+  final suffix = (mod100 >= 11 && mod100 <= 13)
+      ? 'th'
+      : switch (n % 10) {
+          1 => 'st',
+          2 => 'nd',
+          3 => 'rd',
+          _ => 'th',
+        };
+  return '$n$suffix';
 }
 
 const _botNames = ['Ava', 'Milo', 'Nora', 'Theo', 'Iris', 'Leo', 'Zoe', 'Finn', 'June', 'Otto'];
@@ -50,6 +100,9 @@ class SeatView {
 
   /// Coach grade of this seat's latest decision (hero only).
   Grade? grade;
+
+  /// Finishing place once eliminated from a tournament.
+  int? outPlace;
   List<int> hole = const [];
   String? label;
   String? handLabel;
@@ -103,35 +156,51 @@ class GameController extends ChangeNotifier {
     required this.settings,
     required this.history,
     this.sounds = Sounds.silent,
+    Bankroll? bankroll,
+    TournamentStore? tournaments,
     Random? rng,
     this.useIsolates = true,
-  }) : _rng = rng ?? Random.secure() {
-    final players = <TablePlayer?>[];
+  })  : _rng = rng ?? Random.secure(),
+        bankroll = bankroll ?? Bankroll.current,
+        tournaments = tournaments ?? TournamentStore.current {
+    final players = <TablePlayer>[];
     final names = List.of(_botNames)..shuffle(_rng);
+    final stack = config.isTournament ? config.startingStack.chips : config.buyIn;
     for (var i = 0; i < config.seats; i++) {
       if (i == heroSeat) {
-        players.add(TablePlayer(name: settings.playerName, stack: config.buyIn, isHuman: true));
+        players.add(TablePlayer(name: settings.playerName, stack: stack, isHuman: true));
       } else {
         final style = config.style == 'mixed'
             ? _mixedStyles[(i - 1) % _mixedStyles.length]
             : Personality.byId(config.style);
         players.add(TablePlayer(
           name: names[(i - 1) % names.length],
-          stack: config.buyIn,
+          stack: stack,
           personality: style,
           difficulty: config.difficulty,
         ));
       }
     }
-    game = CashGame(seats: players, smallBlind: config.smallBlind, bigBlind: config.bigBlind, rng: _rng);
+    if (config.isTournament) {
+      tournament = Tournament(
+        seats: players,
+        buyIn: config.sngBuyIn,
+        speed: config.speed,
+        payoutStyle: config.payoutStyle,
+        rng: _rng,
+      );
+    } else {
+      cash = CashGame(seats: players, smallBlind: config.smallBlind, bigBlind: config.bigBlind, rng: _rng);
+    }
+    _players = players;
     view = TableView([
       for (var i = 0; i < players.length; i++)
         SeatView(
           index: i,
-          name: players[i]!.name,
-          isHuman: players[i]!.isHuman,
-          style: players[i]!.personality?.label ?? '',
-        )..stack = players[i]!.stack,
+          name: players[i].name,
+          isHuman: players[i].isHuman,
+          style: players[i].personality?.label ?? '',
+        )..stack = players[i].stack,
     ]);
   }
 
@@ -141,11 +210,23 @@ class GameController extends ChangeNotifier {
   final Settings settings;
   final HistoryStore history;
   final Sounds sounds;
+  final Bankroll bankroll;
+  final TournamentStore tournaments;
   final bool useIsolates;
   final Random _rng;
 
-  late final CashGame game;
+  /// Exactly one of these is set, depending on [TableConfig.mode].
+  CashGame? cash;
+  Tournament? tournament;
+  late final List<TablePlayer> _players;
   late final TableView view;
+
+  /// Set when a Sit & Go is over for the player.
+  TournamentOutcome? outcome;
+
+  /// Shown as the headline when the next hand starts (e.g. "Blinds up").
+  String? _pendingHeadline;
+  bool _paid = false;
   HandState? _state;
 
   /// Non-null while waiting for the human to act.
@@ -162,7 +243,7 @@ class GameController extends ChangeNotifier {
   final List<ChipFlight> flights = [];
   int _flightId = 0;
 
-  TablePlayer get hero => game.seats[heroSeat]!;
+  TablePlayer get hero => _players[heroSeat];
   int get sessionNet => hero.stack - hero.buyIns;
 
   // Coach.
@@ -184,6 +265,14 @@ class GameController extends ChangeNotifier {
   void start() {
     if (_running) return;
     _running = true;
+    // Take the buy-in from the bankroll.
+    _paid = bankroll.debit(
+      config.entryCost,
+      note: config.isTournament
+          ? 'Sit & Go · ${config.seats} players'
+          : 'Cash table ${config.smallBlind}/${config.bigBlind}',
+    );
+    if (!config.isTournament && _paid) bankroll.setInPlay(hero.stack);
     unawaited(_loop().catchError((Object e, StackTrace st) {
       FlutterError.reportError(FlutterErrorDetails(exception: e, stack: st, library: 'felt game loop'));
     }));
@@ -204,8 +293,14 @@ class GameController extends ChangeNotifier {
     if (c != null && !c.isCompleted) c.complete();
   }
 
+  /// Whether the bankroll covers a cash-game rebuy.
+  bool get canAffordRebuy => bankroll.canAfford(config.buyIn - hero.stack);
+
   void rebuy() {
-    game.rebuy(heroSeat, config.buyIn - hero.stack);
+    final amount = config.buyIn - hero.stack;
+    if (!bankroll.debit(amount, kind: LedgerKind.rebuy, note: 'Rebuy')) return;
+    cash!.rebuy(heroSeat, amount);
+    bankroll.setInPlay(hero.stack);
     view.seats[heroSeat].stack = hero.stack;
     heroBusted = false;
     final c = _rebuy;
@@ -213,8 +308,14 @@ class GameController extends ChangeNotifier {
     _notify();
   }
 
+  /// True while a Sit & Go is still running for the player (leaving forfeits).
+  bool get tournamentInProgress => tournament != null && outcome == null && _running;
+
   @override
   void dispose() {
+    // Cash games pay out the stack when you leave; leaving a Sit & Go early
+    // forfeits the buy-in.
+    if (cash != null && _running && _paid) bankroll.cashOut(hero.stack, note: 'Cash table ${config.smallBlind}/${config.bigBlind}');
     _disposed = true;
     _heroTurn?.complete(const PlayerAction.fold());
     if (!(_nextHand?.isCompleted ?? true)) _nextHand!.complete();
@@ -235,23 +336,35 @@ class GameController extends ChangeNotifier {
 
   Future<void> _loop() async {
     while (!_disposed) {
-      // Bots who bust buy back in.
-      for (var i = 0; i < game.seats.length; i++) {
-        final p = game.seats[i]!;
-        if (!p.isHuman && p.stack < config.bigBlind) {
-          game.rebuy(i, config.buyIn - p.stack);
-          view.seats[i].stack = p.stack;
+      final t = tournament;
+      if (t == null) {
+        // Cash game: bots who bust buy back in; the player is offered a rebuy.
+        final c = cash!;
+        for (var i = 0; i < _players.length; i++) {
+          final p = _players[i];
+          if (!p.isHuman && p.stack < config.bigBlind) {
+            c.rebuy(i, config.buyIn - p.stack);
+            view.seats[i].stack = p.stack;
+          }
         }
-      }
-      if (hero.stack == 0) {
-        heroBusted = true;
-        _rebuy = Completer<void>();
-        _notify();
-        await _rebuy!.future;
-        if (_disposed) return;
+        if (hero.stack == 0) {
+          heroBusted = true;
+          _rebuy = Completer<void>();
+          _notify();
+          await _rebuy!.future;
+          if (_disposed) return;
+        }
+      } else if (t.isFinished || outcome != null) {
+        return;
       }
 
-      var s = game.startNextHand();
+
+      var s = t != null ? t.startNextHand() : cash!.startNextHand();
+      if (t != null && t.handNumber > 1 && (t.handNumber - 1) ~/ t.speed.handsPerLevel != (t.handNumber - 2) ~/ t.speed.handsPerLevel) {
+        final lvl = levelAt((t.handNumber - 1) ~/ t.speed.handsPerLevel);
+        _pendingHeadline = 'Blinds up: ${formatChips(lvl.smallBlind)}/${formatChips(lvl.bigBlind)}'
+            '${lvl.ante > 0 ? ' · ante ${formatChips(lvl.ante)}' : ''}';
+      }
       _handReviews.clear();
       lastHandReviews = const [];
       _state = s;
@@ -289,9 +402,39 @@ class GameController extends ChangeNotifier {
         s = next;
       }
       if (_disposed) return;
-      game.settle(s);
       lastHandReviews = List.unmodifiable(_handReviews);
-      unawaited(history.add(HandHistory.fromState(s, heroSeat: heroSeat, reviews: lastHandReviews)));
+      unawaited(history.add(HandHistory.fromState(
+        s,
+        heroSeat: heroSeat,
+        reviews: lastHandReviews,
+        mode: t != null ? 'sng' : 'cash',
+        level: t != null ? (t.handNumber - 1) ~/ t.speed.handsPerLevel + 1 : null,
+      )));
+
+      if (t == null) {
+        cash!.settle(s);
+        if (_paid) bankroll.setInPlay(hero.stack);
+      } else {
+        final out = t.settle(s);
+        if (out.isNotEmpty) {
+          for (final e in out) {
+            view.seats[e.seat]
+              ..outPlace = e.place
+              ..label = ordinal(e.place);
+          }
+          view.headline = out.reversed
+              .map((e) => e.seat == heroSeat
+                  ? 'You finish ${ordinal(e.place)}'
+                  : '${view.seats[e.seat].name} finishes ${ordinal(e.place)}')
+              .join(' · ');
+          _notify();
+        }
+        if (t.places.containsKey(heroSeat)) {
+          await _wait(1400);
+          await _finishTournament(t);
+          return;
+        }
+      }
 
       handOver = true;
       _nextHand = Completer<void>();
@@ -320,7 +463,7 @@ class GameController extends ChangeNotifier {
   }
 
   Future<PlayerAction> _askBot(HandState s) async {
-    final bot = game.seats[s.toAct]!.bot!;
+    final bot = _players[s.toAct].bot!;
     final ctx = buildBotContext(s);
     final think = Future<void>.delayed(
         settings.scaled(Duration(milliseconds: 450 + _rng.nextInt(850))));
@@ -334,10 +477,92 @@ class GameController extends ChangeNotifier {
     return results.first! as PlayerAction;
   }
 
-  /// Static so the closure captures only the bot and its context.
+  // ---------------------------------------------------------------- tournament
+
+  Future<void> _finishTournament(Tournament t) async {
+    final place = t.places[heroSeat]!;
+    var winner = t.winner;
+    // If the player is out, play the rest out instantly to name the winner.
+    winner ??= useIsolates ? await _simulateWinner(t) : (t..simulateRest()).winner;
+    final prize = t.prizeFor(heroSeat);
+    if (prize > 0) bankroll.credit(prize, note: 'Sit & Go ${ordinal(place)}');
+    unawaited(tournaments.add(TournamentResult(
+      at: DateTime.now(),
+      players: t.startingPlayers,
+      buyIn: t.buyIn,
+      place: place,
+      prize: prize,
+      speed: t.speed,
+      payoutStyle: t.payoutStyle,
+    )));
+    outcome = TournamentOutcome(
+      place: place,
+      players: t.startingPlayers,
+      prize: prize,
+      buyIn: t.buyIn,
+      winnerName: winner == null ? '' : (winner == heroSeat ? 'You' : _players[winner].name),
+    );
+    sounds.play(place == 1 ? Sfx.win : Sfx.collect);
+    _notify();
+  }
+
+  /// Runs the remaining bot-only tournament in a background isolate.
+  static Future<int?> _simulateWinner(Tournament t) {
+    final seats = [
+      for (final p in t.seats)
+        (p.name, p.stack, p.personality?.id ?? 'tag', p.difficulty),
+    ];
+    final places = Map.of(t.places);
+    final button = t.button, hands = t.handNumber, buyIn = t.buyIn;
+    final speed = t.speed, style = t.payoutStyle;
+    return Isolate.run(() {
+      final copy = Tournament(
+        seats: [
+          for (final (name, stack, pid, diff) in seats)
+            TablePlayer(name: name, stack: stack, personality: Personality.byId(pid), difficulty: diff),
+        ],
+        buyIn: buyIn,
+        speed: speed,
+        payoutStyle: style,
+        rng: Random(),
+      )
+        ..button = button
+        ..handNumber = hands;
+      copy.places.addAll(places);
+      copy.simulateRest();
+      return copy.winner;
+    });
+  }
+
+  /// Level of the hand in play (0-based).
+  int get playingLevel {
+    final t = tournament!;
+    return t.handNumber == 0 ? 0 : (t.handNumber - 1) ~/ t.speed.handsPerLevel;
+  }
+
+  String get tournamentTitle {
+    final lvl = levelAt(playingLevel);
+    return 'Sit & Go · Level ${playingLevel + 1} · ${formatChips(lvl.smallBlind)}/${formatChips(lvl.bigBlind)}'
+        '${lvl.ante > 0 ? ' · ante ${formatChips(lvl.ante)}' : ''}';
+  }
+
+  String get tournamentStatus {
+    final t = tournament!;
+    final untilNext = t.speed.handsPerLevel * (playingLevel + 1) - t.handNumber;
+    final next = untilNext <= 0
+        ? 'blinds up next hand'
+        : 'next level in $untilNext hand${untilNext == 1 ? '' : 's'}';
+    return '${t.playersLeft} of ${t.startingPlayers} left · $next';
+  }
+
+  TournamentInfo? get _tournamentInfo {
+    final t = tournament;
+    return t == null ? null : TournamentInfo(prizes: t.prizes, playersLeft: t.playersLeft);
+  }
+
   /// Coach analysis of the hero's spot (postflop runs Monte Carlo, so off the UI isolate).
   Future<DecisionAnalysis> _analyze(HandState s) {
-    final ctx = buildBotContext(s);
+    final ctx = buildBotContext(s, tournament: _tournamentInfo);
     if (ctx.street == Street.preflop) return Future.value(analyzeDecision(ctx));
     if (!useIsolates) return Future.value(analyzeDecision(ctx, samples: 300, rng: _rng));
     return Isolate.run(() => analyzeDecision(ctx, samples: 2000));
@@ -356,7 +581,8 @@ class GameController extends ChangeNotifier {
           view.board.clear();
           view.pot = 0;
           view.highlight = {};
-          view.headline = null;
+          view.headline = _pendingHeadline;
+          _pendingHeadline = null;
           view.button = e.button;
           view.handNumber = e.handNumber;
           for (final sv in view.seats) {
@@ -387,6 +613,14 @@ class GameController extends ChangeNotifier {
           sounds.play(Sfx.chip);
           _notify();
           await _wait(160);
+        case AntePosted():
+          final sv = view.seats[e.seat];
+          sv.stack -= e.amount;
+          sv.allIn = sv.stack == 0;
+          sounds.play(Sfx.chip);
+          await _fly([(SeatAnchor(e.seat), const PotAnchor(), e.amount)]);
+          view.pot += e.amount;
+          _notify();
         case HoleCardsDealt():
           for (var round = 0; round < 2; round++) {
             for (final i in e.order) {

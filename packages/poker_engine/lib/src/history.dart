@@ -14,10 +14,12 @@ class HandHistory {
     required this.summary,
     this.heroHole,
     this.reviews = const [],
+    this.mode = 'cash',
+    this.level,
   });
 
   factory HandHistory.fromState(HandState s,
-      {required int heroSeat, DateTime? at, List<DecisionReview> reviews = const []}) {
+      {required int heroSeat, DateTime? at, List<DecisionReview> reviews = const [], String mode = 'cash', int? level}) {
     final start = s.log.whereType<HandStarted>().first;
     final startStack = (start.seats[heroSeat]['stack'] as int?) ?? 0;
     final hero = s.seats[heroSeat];
@@ -30,6 +32,8 @@ class HandHistory {
       summary: _summary(s, heroSeat),
       heroHole: hero.inHand ? List.of(hero.hole) : null,
       reviews: reviews,
+      mode: mode,
+      level: level,
     );
   }
 
@@ -41,6 +45,8 @@ class HandHistory {
         events: [for (final e in j['events'] as List) (e as Map).cast<String, Object?>()],
         summary: j['summary'] as String,
         heroHole: (j['hole'] as List?)?.cast<int>(),
+        mode: (j['mode'] as String?) ?? 'cash',
+        level: j['level'] as int?,
         reviews: [
           for (final r in (j['reviews'] as List?) ?? const [])
             DecisionReview.fromJson((r as Map).cast<String, Object?>()),
@@ -61,6 +67,13 @@ class HandHistory {
   /// The coach's grades for the hero's decisions (empty for older records).
   final List<DecisionReview> reviews;
 
+  /// 'cash' or 'sng'.
+  final String mode;
+
+  /// Tournament blind level (1-based), if [mode] is 'sng'.
+  final int? level;
+  bool get isTournament => mode == 'sng';
+
   Map<String, Object?> toJson() => {
         'hand': handNumber,
         'at': playedAt.toIso8601String(),
@@ -70,6 +83,8 @@ class HandHistory {
         'summary': summary,
         if (heroHole != null) 'hole': heroHole,
         if (reviews.isNotEmpty) 'reviews': [for (final r in reviews) r.toJson()],
+        if (mode != 'cash') 'mode': mode,
+        if (level != null) 'level': level,
       };
 
   String encode() => jsonEncode(toJson());

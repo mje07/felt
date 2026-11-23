@@ -29,6 +29,9 @@ class RangeChart {
   RangeChart(this.title, String raise, [String call = ''])
       : raise = parseRange(raise),
         call = parseRange(call).difference(parseRange(raise));
+
+  /// A chart from precomputed hand sets.
+  RangeChart.sets(this.title, this.raise, [Set<int> call = const {}]) : call = call.difference(raise);
   final String title;
   final Set<int> raise, call;
 

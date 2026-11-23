@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import '../bots/preflop_chart.dart';
 import '../game_state.dart';
 import 'advisor.dart';
@@ -26,7 +28,10 @@ enum MistakeKind {
   overplayedWeak('Overplaying weak hands'),
   preflopTooLoose('Playing too many hands preflop'),
   preflopTooTight('Folding playable hands preflop'),
-  openLimp('Limping instead of raising');
+  openLimp('Limping instead of raising'),
+  shoveTooLoose('Shoving too wide'),
+  shoveTooTight('Not shoving short stacks enough'),
+  callShoveTooLoose('Calling all-ins too light in tournaments');
 
   const MistakeKind(this.label);
   final String label;
@@ -94,6 +99,8 @@ String _pct(double v) => '${(v * 100).round()}%';
 /// Grades [taken] against the coach's analysis. Returns null for spots the
 /// coach doesn't grade (short-stacked preflop).
 DecisionReview? gradeDecision(DecisionAnalysis a, PlayerAction taken) {
+  if (a.shoveCall != null && taken.type != ActionType.check) return _gradeShoveCall(a, taken);
+  if (a.pushFold) return _gradePushFold(a, taken);
   return a.isPreflop ? _gradePreflop(a, taken) : _gradePostflop(a, taken);
 }
 
@@ -248,6 +255,9 @@ DecisionReview _gradePostflop(DecisionAnalysis a, PlayerAction taken) {
     case MistakeKind.preflopTooLoose:
     case MistakeKind.preflopTooTight:
     case MistakeKind.openLimp:
+    case MistakeKind.shoveTooLoose:
+    case MistakeKind.shoveTooTight:
+    case MistakeKind.callShoveTooLoose:
     case null:
       if (grade == Grade.best) {
         text = 'Good decision. With about $eq equity against $who, $takenLabel was the strongest option.';
@@ -268,5 +278,133 @@ DecisionReview _gradePostflop(DecisionAnalysis a, PlayerAction taken) {
     lossBb: lossBb,
     equity: e,
     requiredEquity: req > 0 ? req : null,
+  );
+}
+
+DecisionReview? _gradePushFold(DecisionAnalysis a, PlayerAction taken) {
+  final adv = a.preflop;
+  if (adv == null) return null;
+  final hand = startingHandName(a.handIndex);
+  final pos = a.position ?? '';
+  final bb = a.effectiveStackBb.round();
+  final width = _pct(rangeFraction(adv.chart.played));
+  final shoveRec = adv.action == PreAction.raise;
+  final pct = preflopPercentileOf(a.handIndex);
+  final edge = pct + adv.depth;
+  final strength = edge <= 0 ? 1.0 : pct / edge;
+  final allIn = taken.amount >= a.legal.maxRaiseTo;
+  final aggressive = taken.type == ActionType.bet || taken.type == ActionType.raise;
+
+  Grade grade;
+  MistakeKind? kind;
+  String text;
+  if (aggressive && shoveRec) {
+    grade = allIn ? Grade.best : Grade.good;
+    text = allIn
+        ? '$hand is a shove from the $pos with $bb big blinds (push/fold range: top $width).'
+        : '$hand is strong enough to play, but at $bb big blinds shoving is simpler and stronger than a small raise.';
+  } else if (!aggressive && !shoveRec && taken.type == ActionType.fold) {
+    grade = Grade.best;
+    text = '$hand is outside the $bb big blind shoving range from the $pos (top $width). Folding is right.';
+  } else if (taken.type == ActionType.fold) {
+    kind = MistakeKind.shoveTooTight;
+    grade = strength < 0.3 ? Grade.blunder : (strength < 0.7 ? Grade.mistake : Grade.inaccuracy);
+    text = 'With $bb big blinds, $hand is a shove from the $pos (the push/fold range is the top $width). '
+        'Short stacks need to take these spots before the blinds eat them.';
+  } else if (taken.type == ActionType.call) {
+    kind = shoveRec ? MistakeKind.openLimp : MistakeKind.shoveTooLoose;
+    grade = Grade.inaccuracy;
+    text = shoveRec
+        ? 'Limping $hand with $bb big blinds gives up fold equity. Shove instead.'
+        : '$hand is too weak to play from the $pos at $bb big blinds; limping just bleeds chips.';
+  } else {
+    final outside = -adv.depth;
+    kind = MistakeKind.shoveTooLoose;
+    grade = outside < 0.08 ? Grade.inaccuracy : (outside < 0.25 ? Grade.mistake : Grade.blunder);
+    text = '$hand is ${outside < 0.08 ? 'just' : 'well'} outside the $bb big blind shoving range from the $pos '
+        '(top $width). Folding was better.';
+  }
+  return DecisionReview(
+    street: Street.preflop,
+    taken: a.describe(taken),
+    recommended: shoveRec ? 'Shove' : 'Fold',
+    grade: grade,
+    kind: kind,
+    explanation: text,
+  );
+}
+
+DecisionReview _gradeShoveCall(DecisionAnalysis a, PlayerAction taken) {
+  final s = a.shoveCall!;
+  final called = taken.type != ActionType.fold;
+  final best = max(s.evCall, s.evFold);
+  final loss = best - (called ? s.evCall : s.evFold);
+  final frac = loss / (s.scale <= 0 ? 1 : s.scale);
+
+  Grade grade;
+  if (s.icm) {
+    grade = frac <= 0.004
+        ? Grade.best
+        : frac <= 0.012
+            ? Grade.good
+            : frac <= 0.03
+                ? Grade.inaccuracy
+                : frac <= 0.08
+                    ? Grade.mistake
+                    : Grade.blunder;
+  } else {
+    grade = loss / a.bigBlind < 0.5 || frac <= 0.02
+        ? Grade.best
+        : frac <= 0.08
+            ? Grade.good
+            : frac <= 0.2
+                ? Grade.inaccuracy
+                : frac <= 0.45
+                    ? Grade.mistake
+                    : Grade.blunder;
+  }
+
+  MistakeKind? kind;
+  if (grade.index >= Grade.inaccuracy.index) {
+    kind = called ? (s.icm ? MistakeKind.callShoveTooLoose : MistakeKind.callingWithoutOdds) : MistakeKind.foldingWithOdds;
+  }
+
+  final eq = _pct(s.equity);
+  final range = "${s.shoverName}'s ${a.isPreflop ? 'shoving ' : ''}range (top ${_pct(s.rangeWidth)})";
+  final poolPct = '${(frac * 100).toStringAsFixed(frac < 0.01 ? 1 : 0)}%';
+  final bubble = s.onBubble ? ' On the bubble (${s.playersLeft} left, ${s.paidPlaces} paid),' : '';
+  final icmNote = s.icm && s.chipsSayCall && !s.callIsBetter
+      ? '$bubble In chips this is a call, but busting costs you more prize money than doubling up would win.'
+      : '';
+  String text;
+  if (s.icm) {
+    if (grade == Grade.best || grade == Grade.good) {
+      text = called
+          ? 'Good call. Against $range you have about $eq, enough even after accounting for the prize structure.'
+          : 'Good fold. You\'d have about $eq against $range.$icmNote';
+    } else if (called) {
+      text = 'Calling with about $eq against $range costs about $poolPct of the prize pool compared with folding.$icmNote';
+    } else {
+      text = 'Against $range you have about $eq: calling is worth about $poolPct of the prize pool more than folding.';
+    }
+  } else {
+    text = grade == Grade.best || grade == Grade.good
+        ? (called
+            ? 'Good call: about $eq against $range is enough at this price.'
+            : 'Good fold: about $eq against $range isn\'t enough at this price.')
+        : (called
+            ? 'Calling with about $eq against $range loses chips over time. Folding was better.'
+            : 'With about $eq against $range, calling was profitable. Folding gave up value.');
+  }
+
+  return DecisionReview(
+    street: a.street,
+    taken: a.describe(taken),
+    recommended: s.callIsBetter ? (a.legal.callAmount >= a.stack ? 'Call all-in' : 'Call') : 'Fold',
+    grade: grade,
+    kind: kind,
+    explanation: text,
+    equity: s.equity,
+    lossBb: s.icm ? null : loss / a.bigBlind,
   );
 }

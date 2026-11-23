@@ -1,6 +1,7 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 
+import '../app/bankroll.dart';
 import '../app/controller.dart';
 import '../app/history_store.dart';
 import '../app/settings.dart';
@@ -121,7 +122,9 @@ class _TableScreenState extends State<TableScreen> {
             ),
             ListenableBuilder(
               listenable: c,
-              builder: (context, _) => c.heroBusted ? _BustOverlay(controller: c) : const SizedBox.shrink(),
+              builder: (context, _) => c.outcome != null
+                  ? _ResultsOverlay(controller: c, history: widget.history)
+                  : (c.heroBusted ? _BustOverlay(controller: c) : const SizedBox.shrink()),
             ),
           ],
         ),
@@ -145,7 +148,7 @@ class _TopBar extends StatelessWidget {
         children: [
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            onPressed: () => Navigator.of(context).maybePop(),
+            onPressed: () => leaveTable(context, controller),
             child: Row(children: [
               Icon(CupertinoIcons.chevron_left, size: 18, color: p.accent),
               const SizedBox(width: 2),
@@ -157,9 +160,16 @@ class _TopBar extends StatelessWidget {
             listenable: controller,
             builder: (context, _) => Column(
               children: [
-                Text("No-Limit Hold'em · ${cfg.smallBlind}/${cfg.bigBlind}", style: Typo.headline(p.label)),
                 Text(
-                  controller.view.handNumber > 0 ? 'Hand #${controller.view.handNumber}' : 'Shuffling…',
+                  controller.tournament != null
+                      ? controller.tournamentTitle
+                      : "No-Limit Hold'em · ${cfg.smallBlind}/${cfg.bigBlind}",
+                  style: Typo.headline(p.label),
+                ),
+                Text(
+                  controller.tournament != null
+                      ? controller.tournamentStatus
+                      : (controller.view.handNumber > 0 ? 'Hand #${controller.view.handNumber}' : 'Shuffling…'),
                   style: Typo.caption(p.secondaryLabel),
                 ),
               ],
@@ -184,6 +194,9 @@ class _TopBar extends StatelessWidget {
               return Row(children: [
                 if (acc != null && SettingsScope.of(context).showCoachAtTable)
                   readout('ACCURACY', Text('${acc.round()}%', style: Typo.number(p.label, size: 15))),
+                if (controller.tournament != null)
+                  readout('PRIZE POOL', Text(formatChips(controller.tournament!.prizePool), style: Typo.number(p.label, size: 15)))
+                else
                 readout(
                   'SESSION',
                   AnimatedCount(
@@ -249,9 +262,12 @@ class _BustOverlay extends StatelessWidget {
                     PillButton(label: 'Leave Table', onPressed: () => Navigator.of(context).maybePop()),
                     const SizedBox(width: Space.s),
                     PillButton(
-                      label: 'Rebuy ${formatChips(controller.config.buyIn)}',
+                      label: controller.canAffordRebuy ? 'Rebuy ${formatChips(controller.config.buyIn)}' : 'Top Up & Rebuy',
                       style: PillStyle.filled,
-                      onPressed: controller.rebuy,
+                      onPressed: () {
+                        if (!controller.canAffordRebuy) Bankroll.current.topUp();
+                        controller.rebuy();
+                      },
                     ),
                   ],
                 ),
@@ -260,6 +276,133 @@ class _BustOverlay extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Route that opens a table with [config] (lobby and "Play again").
+PageRouteBuilder<void> tableRoute(TableConfig config, HistoryStore history) => PageRouteBuilder<void>(
+      transitionDuration: Motion.slow,
+      reverseTransitionDuration: Motion.medium,
+      pageBuilder: (_, _, _) => TableScreen(config: config, history: history),
+      transitionsBuilder: (_, a, _, child) {
+        final c = CurvedAnimation(parent: a, curve: Motion.spring);
+        return FadeTransition(
+          opacity: c,
+          child: ScaleTransition(scale: Tween(begin: 1.04, end: 1.0).animate(c), child: child),
+        );
+      },
+    );
+
+/// Leaves the table; leaving a running Sit & Go asks to confirm the forfeit.
+Future<void> leaveTable(BuildContext context, GameController c) async {
+  if (c.tournamentInProgress) {
+    final ok = await confirmAction(
+      context,
+      title: 'Leave the Sit & Go?',
+      message: 'You\'ll forfeit your ${formatChips(c.config.sngBuyIn)} buy-in. Your seat won\'t be kept.',
+      action: 'Leave',
+    );
+    if (!ok || !context.mounted) return;
+  }
+  await Navigator.of(context).maybePop();
+}
+
+class _ResultsOverlay extends StatelessWidget {
+  const _ResultsOverlay({required this.controller, required this.history});
+  final GameController controller;
+  final HistoryStore history;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final o = controller.outcome!;
+    final net = o.prize - o.buyIn;
+    final title = o.won ? 'You won the Sit & Go!' : 'You finished ${ordinal(o.place)} of ${o.players}';
+    final subtitle = o.won
+        ? 'Last one standing out of ${o.players}.'
+        : o.inTheMoney
+            ? 'In the money. ${o.winnerName} won the tournament.'
+            : '${o.winnerName} went on to win the tournament.';
+    return Positioned.fill(
+      child: ColoredBox(
+        color: const Color(0x66000000),
+        child: Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.92, end: 1),
+            duration: Motion.slow,
+            curve: Motion.snappy,
+            builder: (context, s, child) => Transform.scale(scale: s, child: child),
+            child: GlassPanel(
+              radius: Radii.xl,
+              padding: const EdgeInsets.all(Space.xxl),
+              child: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: (o.inTheMoney ? const Color(0xFFFFB800) : p.secondaryLabel).withValues(alpha: 0.16),
+                      ),
+                      child: Icon(
+                        o.won ? CupertinoIcons.rosette : (o.inTheMoney ? CupertinoIcons.star_fill : CupertinoIcons.flag_fill),
+                        size: 32,
+                        color: o.inTheMoney ? const Color(0xFFE0A000) : p.secondaryLabel,
+                      ),
+                    ),
+                    const SizedBox(height: Space.l),
+                    Text(title, textAlign: TextAlign.center, style: Typo.title(p.label)),
+                    const SizedBox(height: Space.xs),
+                    Text(subtitle, textAlign: TextAlign.center, style: Typo.body(p.secondaryLabel)),
+                    const SizedBox(height: Space.xl),
+                    Row(children: [
+                      _Figure('PRIZE', formatChips(o.prize)),
+                      _Figure('BUY-IN', formatChips(o.buyIn)),
+                      _Figure('NET', '${net > 0 ? '+' : (net < 0 ? '−' : '')}${formatChips(net.abs())}',
+                          color: net > 0 ? p.positive : (net < 0 ? p.destructive : null)),
+                    ]),
+                    const SizedBox(height: Space.xl),
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      PillButton(label: 'Lobby', onPressed: () => Navigator.of(context).maybePop()),
+                      const SizedBox(width: Space.s),
+                      PillButton(
+                        label: 'Play Again',
+                        sublabel: formatChips(controller.config.sngBuyIn),
+                        style: PillStyle.filled,
+                        onPressed: Bankroll.current.canAfford(controller.config.sngBuyIn)
+                            ? () => Navigator.of(context).pushReplacement(tableRoute(controller.config, history))
+                            : null,
+                      ),
+                    ]),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Figure extends StatelessWidget {
+  const _Figure(this.label, this.value, {this.color});
+  final String label, value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Expanded(
+      child: Column(children: [
+        Text(label, style: Typo.caption(p.secondaryLabel).copyWith(letterSpacing: 0.8)),
+        const SizedBox(height: 2),
+        Text(value, style: Typo.number(color ?? p.label, size: 20)),
+      ]),
     );
   }
 }

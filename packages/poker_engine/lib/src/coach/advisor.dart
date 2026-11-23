@@ -5,7 +5,9 @@ import '../bots/preflop_chart.dart';
 import '../equity.dart';
 import '../evaluator.dart';
 import '../game_state.dart';
+import '../icm.dart';
 import 'outs.dart';
+import 'pushfold.dart';
 import 'ranges.dart';
 
 /// One candidate action with its estimated value.
@@ -35,6 +37,9 @@ class DecisionAnalysis {
     this.position,
     this.scenario,
     this.preflop,
+    this.pushFold = false,
+    this.shoveCall,
+    this.effectiveStackBb = 100,
   });
 
   final Street street;
@@ -75,6 +80,13 @@ class DecisionAnalysis {
   final String? position;
   final PreflopScenario? scenario;
   final PreflopAdvice? preflop;
+
+  /// Short-stacked unopened spot judged by the push/fold charts.
+  final bool pushFold;
+
+  /// Facing an all-in: solved call-or-fold (ICM in tournaments).
+  final ShoveCall? shoveCall;
+  final double effectiveStackBb;
 
   bool get isPreflop => street == Street.preflop;
 
@@ -178,11 +190,43 @@ class DecisionAnalysis {
 DecisionAnalysis analyzeDecision(BotContext ctx, {int samples = 2500, Random? rng}) {
   final handIndex = startingHandIndex(ctx.hole[0], ctx.hole[1]);
   final note = _opponentNote(ctx);
+  final r = rng ?? Random();
+  final facingShove = ctx.allInAggressor != null && ctx.legal.canCall;
   if (ctx.street == Street.preflop) {
     final scenario = scenarioFor(
         position: ctx.position, raisesBefore: ctx.preflopRaises, openerPosition: ctx.openerPosition);
-    // Charts assume deep stacks; short-stack spots are push/fold territory.
-    final advice = ctx.effectiveStackBb >= 20 ? adviseFor(ctx.position, scenario, handIndex) : null;
+    final headsUp = ctx.stacksBefore.where((b) => b > 0).length == 2;
+    PreflopAdvice? advice;
+    ShoveCall? shoveCall;
+    var pushFold = false;
+    if (facingShove && ctx.preflopRaises == 1) {
+      // Call-or-fold against a single all-in: solved directly (ICM in tournaments).
+      final shoverBb = ctx.stacksBefore[ctx.allInAggressor!] / ctx.bigBlind;
+      final heroBb = ctx.stacksBefore[ctx.seat] / ctx.bigBlind;
+      final eff = min(shoverBb, heroBb);
+      final width = eff <= 16
+          ? shoveWidth(ctx.openerPosition ?? 'UTG', stackBucket(eff), headsUp: headsUp)
+          : ctx.opponentRanges.reduce(min);
+      final e = monteCarloEquity(
+        hole: ctx.hole,
+        board: const [],
+        opponents: 1,
+        iterations: max(600, samples ~/ 2),
+        rng: r,
+        opponentRanges: [width],
+      ).equity;
+      shoveCall = ShoveCall.compute(ctx, e, width);
+    } else if (ctx.effectiveStackBb <= 15 && ctx.preflopRaises == 0 && !ctx.legal.canCheck) {
+      pushFold = true;
+      advice = pushFoldAdvice(
+        position: ctx.position,
+        stackBb: ctx.effectiveStackBb,
+        handIndex: handIndex,
+        headsUp: headsUp,
+      );
+    } else if (ctx.effectiveStackBb >= 15) {
+      advice = adviseFor(ctx.position, scenario, handIndex);
+    }
     return DecisionAnalysis._(
       street: ctx.street,
       legal: ctx.legal,
@@ -195,9 +239,11 @@ DecisionAnalysis analyzeDecision(BotContext ctx, {int samples = 2500, Random? rn
       position: ctx.position,
       scenario: scenario,
       preflop: advice,
+      pushFold: pushFold,
+      shoveCall: shoveCall,
+      effectiveStackBb: ctx.effectiveStackBb,
     );
   }
-  final r = rng ?? Random();
   final e = monteCarloEquity(
     hole: ctx.hole,
     board: ctx.board,
@@ -223,7 +269,104 @@ DecisionAnalysis analyzeDecision(BotContext ctx, {int samples = 2500, Random? rn
     calledEquities: called,
     outs: outsToStraightOrBetter(ctx.hole, ctx.board).length,
     position: ctx.position,
+    // In tournaments, facing an all-in is judged by prize equity (ICM).
+    shoveCall: facingShove && ctx.tournament != null
+        ? ShoveCall.compute(ctx, e, ctx.opponentRanges.isEmpty ? 1.0 : ctx.opponentRanges.reduce(min))
+        : null,
+    effectiveStackBb: ctx.effectiveStackBb,
   );
+}
+
+/// Call-or-fold against an all-in, valued in prize equity (ICM) during a
+/// tournament or in chips otherwise.
+class ShoveCall {
+  const ShoveCall({
+    required this.equity,
+    required this.evCall,
+    required this.evFold,
+    required this.chipEvCall,
+    required this.chipEvFold,
+    required this.scale,
+    required this.icm,
+    required this.rangeWidth,
+    required this.shoverName,
+    this.playersLeft,
+    this.paidPlaces,
+  });
+
+  /// Our share of the pot if we call.
+  final double equity;
+
+  /// Value of calling / folding: prize equity if [icm], otherwise chips.
+  final double evCall, evFold;
+  final double chipEvCall, chipEvFold;
+
+  /// Prize pool (ICM) or pot (chips), for grading losses as a fraction.
+  final double scale;
+  final bool icm;
+  final double rangeWidth;
+  final String shoverName;
+  final int? playersLeft, paidPlaces;
+
+  bool get callIsBetter => evCall >= evFold;
+  bool get chipsSayCall => chipEvCall >= chipEvFold;
+  bool get onBubble => playersLeft != null && paidPlaces != null && playersLeft == paidPlaces! + 1;
+
+  static ShoveCall compute(BotContext ctx, double equity, double rangeWidth) {
+    final b = ctx.stacksBefore, c = ctx.committed;
+    final hero = ctx.seat, sh = ctx.allInAggressor!;
+    final pot = c.fold(0, (a, x) => a + x);
+    final eff = min(b[hero], b[sh]);
+    final dead = pot - c[hero] - c[sh];
+    final base = [for (var i = 0; i < b.length; i++) b[i] - c[i]];
+    List<int> outcome({required bool call, required bool win}) {
+      final x = List.of(base);
+      if (!call) {
+        x[hero] = b[hero] - c[hero];
+        x[sh] = b[sh] + c[hero] + dead;
+      } else if (win) {
+        x[hero] = b[hero] + eff + dead;
+        x[sh] = b[sh] - eff;
+      } else {
+        x[hero] = b[hero] - eff;
+        x[sh] = b[sh] + eff + dead;
+      }
+      return x;
+    }
+
+    final winX = outcome(call: true, win: true), loseX = outcome(call: true, win: false);
+    final foldX = outcome(call: false, win: false);
+    final chipCall = equity * winX[hero] + (1 - equity) * loseX[hero];
+    final chipFold = foldX[hero].toDouble();
+    final t = ctx.tournament;
+    if (t == null) {
+      return ShoveCall(
+        equity: equity,
+        evCall: chipCall,
+        evFold: chipFold,
+        chipEvCall: chipCall,
+        chipEvFold: chipFold,
+        scale: max(1, pot).toDouble(),
+        icm: false,
+        rangeWidth: rangeWidth,
+        shoverName: ctx.allInAggressorName ?? 'your opponent',
+      );
+    }
+    double v(List<int> stacks) => icmEquities(stacks, t.prizes)[hero];
+    return ShoveCall(
+      equity: equity,
+      evCall: equity * v(winX) + (1 - equity) * v(loseX),
+      evFold: v(foldX),
+      chipEvCall: chipCall,
+      chipEvFold: chipFold,
+      scale: t.pool.toDouble(),
+      icm: true,
+      rangeWidth: rangeWidth,
+      shoverName: ctx.allInAggressorName ?? 'your opponent',
+      playersLeft: t.playersLeft,
+      paidPlaces: t.prizes.length,
+    );
+  }
 }
 
 /// Share of each opponent's range assumed to continue vs a bet of ⅓ pot,

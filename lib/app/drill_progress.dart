@@ -68,6 +68,7 @@ DrillKind drillFor(MistakeKind kind) => switch (kind) {
       MistakeKind.callingWithoutOdds || MistakeKind.foldingWithOdds => DrillKind.potOdds,
       MistakeKind.preflopTooLoose || MistakeKind.preflopTooTight || MistakeKind.openLimp => DrillKind.preflop,
       MistakeKind.missedValue || MistakeKind.passiveWithStrong || MistakeKind.overplayedWeak => DrillKind.equity,
+      MistakeKind.shoveTooLoose || MistakeKind.shoveTooTight || MistakeKind.callShoveTooLoose => DrillKind.pushFold,
     };
 
 /// The drill to recommend from the player's most frequent coach mistakes.

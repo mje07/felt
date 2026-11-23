@@ -27,6 +27,11 @@ class BotContext {
     this.openerPosition,
     this.effectiveStackBb = 100,
     this.opponentNames = const [],
+    this.tournament,
+    this.stacksBefore = const [],
+    this.committed = const [],
+    this.allInAggressor,
+    this.allInAggressorName,
   });
 
   final int seat;
@@ -60,6 +65,16 @@ class BotContext {
 
   /// Live opponents' names, aligned with [opponentRanges].
   final List<String> opponentNames;
+
+  /// Set in tournaments: prizes and players left (for ICM).
+  final TournamentInfo? tournament;
+
+  /// Per seat: chips at the start of the hand, and chips committed so far.
+  final List<int> stacksBefore, committed;
+
+  /// Seat of an opponent whose bet/raise put them all-in (we face a shove).
+  final int? allInAggressor;
+  final String? allInAggressorName;
 }
 
 abstract interface class Bot {
@@ -67,7 +82,7 @@ abstract interface class Bot {
 }
 
 /// Builds the bot's view of [s] for the player to act.
-BotContext buildBotContext(HandState s) {
+BotContext buildBotContext(HandState s, {TournamentInfo? tournament}) {
   final legal = legalActions(s);
   final me = s.seats[s.toAct];
   final raisedPre = <int>{};
@@ -142,6 +157,13 @@ BotContext buildBotContext(HandState s) {
         : positionOf(seat: opener, button: s.button, bbSeat: s.bigBlindSeat, active: active),
     effectiveStackBb: effective / s.bigBlind,
     opponentNames: [for (final p in live) p.name],
+    tournament: tournament,
+    stacksBefore: [for (final p in s.seats) p.inHand ? p.stack + p.totalBet : 0],
+    committed: [for (final p in s.seats) p.totalBet],
+    allInAggressor: s.lastAggressor >= 0 && s.seats[s.lastAggressor].allIn && s.seats[s.lastAggressor].live && s.lastAggressor != me.index
+        ? s.lastAggressor
+        : null,
+    allInAggressorName: s.lastAggressor >= 0 ? s.seats[s.lastAggressor].name : null,
   );
 }
 
@@ -154,4 +176,16 @@ PlayerAction raiseOrShove(BotContext ctx, int desiredTo) {
   final leftover = l.maxRaiseTo - to;
   if (leftover < (ctx.pot + to) * 0.35) to = l.maxRaiseTo;
   return PlayerAction(l.isBet ? ActionType.bet : ActionType.raise, to);
+}
+
+/// What the coach needs to know about a tournament for ICM.
+class TournamentInfo {
+  const TournamentInfo({required this.prizes, required this.playersLeft});
+
+  /// Prize for 1st, 2nd, ... (paid places only).
+  final List<int> prizes;
+  final int playersLeft;
+
+  int get pool => prizes.fold(0, (a, b) => a + b);
+  bool get onBubble => playersLeft == prizes.length + 1;
 }

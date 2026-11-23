@@ -37,6 +37,7 @@ HandState startHand({
   required int button,
   required int smallBlind,
   required int bigBlind,
+  int ante = 0,
   required int handNumber,
   Random? rng,
   List<int>? deck,
@@ -75,7 +76,7 @@ HandState startHand({
   );
   final log = state.log;
   log.add(HandStarted(handNumber, button, sbSeat, bbSeat, smallBlind, bigBlind,
-      [for (final s in seats) s.toJson()]));
+      [for (final s in seats) s.toJson()], ante: ante));
 
   void post(int seat, int amount, bool big) {
     final s = seats[seat];
@@ -89,6 +90,17 @@ HandState startHand({
 
   post(sbSeat, smallBlind, false);
   post(bbSeat, bigBlind, true);
+  // Big-blind ante: dead money (counts towards the pot, not the street bet).
+  if (ante > 0) {
+    final b = seats[bbSeat];
+    final a = min(ante, b.stack);
+    if (a > 0) {
+      b.stack -= a;
+      b.totalBet += a;
+      if (b.stack == 0) b.allIn = true;
+      log.add(AntePosted(bbSeat, a));
+    }
+  }
   // Players must call the full big blind even if the BB is short.
   state.currentBet = bigBlind;
 
