@@ -1,12 +1,17 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 
+import '../app/drill_progress.dart';
+import '../app/history_store.dart';
 import '../app/settings.dart';
 import '../app/sounds.dart';
 import '../app/theme.dart';
 import '../widgets/playing_card.dart';
 
 class SettingsPanel extends StatelessWidget {
-  const SettingsPanel({super.key});
+  const SettingsPanel({super.key, this.history});
+
+  /// Needed for the Data section (resetting hand history).
+  final HistoryStore? history;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +129,7 @@ class SettingsPanel extends StatelessWidget {
               ),
             ],
           ),
+          if (history != null) _DataSection(history: history!),
           CupertinoListSection.insetGrouped(
             header: const Text('KEYBOARD'),
             children: const [
@@ -157,6 +163,95 @@ class _Key extends StatelessWidget {
         ),
         child: Text(key_, style: Typo.callout(p.secondaryLabel)),
       ),
+    );
+  }
+}
+
+class _DataSection extends StatefulWidget {
+  const _DataSection({required this.history});
+  final HistoryStore history;
+
+  @override
+  State<_DataSection> createState() => _DataSectionState();
+}
+
+class _DataSectionState extends State<_DataSection> {
+  String? _done;
+
+  Future<bool> _confirm(String title, String message, String action) async {
+    final ok = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(padding: const EdgeInsets.only(top: 6), child: Text(message)),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  Future<void> _resetHistory() async {
+    final n = widget.history.hands.length;
+    final ok = await _confirm(
+      'Reset hand history?',
+      'This permanently deletes ${formatChips(n)} saved hand${n == 1 ? '' : 's'}, along with your statistics, '
+          'player profile, coach grades and charts. This can\'t be undone.',
+      'Reset',
+    );
+    if (!ok) return;
+    await widget.history.clear();
+    if (mounted) setState(() => _done = 'Hand history and statistics were reset.');
+  }
+
+  Future<void> _resetTraining() async {
+    final ok = await _confirm(
+      'Reset training progress?',
+      'This clears your drill accuracy and best streaks. This can\'t be undone.',
+      'Reset',
+    );
+    if (!ok) return;
+    DrillProgress.current.reset();
+    if (mounted) setState(() => _done = 'Training progress was reset.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final n = widget.history.hands.length;
+    final answered = DrillProgress.current.records.values.fold(0, (a, r) => a + r.answered);
+    Widget resetRow(String title, String subtitle, bool enabled, VoidCallback onTap) => CupertinoListTile(
+          title: Text(title, style: TextStyle(color: enabled ? p.destructive : p.tertiaryLabel)),
+          subtitle: Text(subtitle),
+          onTap: enabled ? onTap : null,
+        );
+    return CupertinoListSection.insetGrouped(
+      header: const Text('DATA'),
+      footer: _done == null ? null : Text(_done!),
+      children: [
+        resetRow(
+          'Reset Hand History & Stats',
+          n == 0 ? 'No hands saved' : '${formatChips(n)} hand${n == 1 ? '' : 's'} saved',
+          n > 0,
+          _resetHistory,
+        ),
+        resetRow(
+          'Reset Training Progress',
+          answered == 0 ? 'No drills answered yet' : '${formatChips(answered)} drill answers saved',
+          answered > 0,
+          _resetTraining,
+        ),
+      ],
     );
   }
 }

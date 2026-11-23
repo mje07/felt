@@ -2,9 +2,11 @@ import 'dart:math';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:felt/app/controller.dart';
+import 'package:felt/app/drill_progress.dart';
 import 'package:felt/app/history_store.dart';
 import 'package:felt/app/settings.dart';
 import 'package:felt/main.dart';
+import 'package:felt/screens/settings_panel.dart';
 import 'package:felt/screens/table_screen.dart';
 import 'package:felt/screens/training_screen.dart';
 import 'package:felt/widgets/action_bar.dart';
@@ -137,6 +139,56 @@ void main() {
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 10));
+  });
+
+  testWidgets('resetting data asks first, then clears history and drills', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final history = HistoryStore.memory();
+    final game = CashGame(
+        seats: [TablePlayer(name: 'A', stack: 500, isHuman: true), TablePlayer(name: 'B', stack: 500)],
+        smallBlind: 5,
+        bigBlind: 10,
+        rng: Random(2));
+    for (var i = 0; i < 3; i++) {
+      var s = game.startNextHand();
+      while (!s.isComplete) {
+        s = applyAction(s, legalActions(s).canCheck ? const PlayerAction.check() : const PlayerAction.call());
+      }
+      game.settle(s);
+      history.hands.add(HandHistory.fromState(s, heroSeat: 0));
+    }
+    DrillProgress.current.record(DrillKind.outs, correct: true, streak: 1);
+
+    await tester.pumpWidget(_host(
+      Settings.memory(),
+      CupertinoPageScaffold(child: SingleChildScrollView(child: SettingsPanel(history: history))),
+    ));
+    expect(find.text('3 hands saved'), findsOneWidget);
+
+    // Cancel keeps everything.
+    await tester.tap(find.text('Reset Hand History & Stats'));
+    await tester.pumpAndSettle();
+    expect(find.text('Reset hand history?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(history.hands.length, 3);
+
+    // Confirm clears.
+    await tester.tap(find.text('Reset Hand History & Stats'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, 'Reset'));
+    await tester.pumpAndSettle();
+    expect(history.hands, isEmpty);
+    expect(find.text('No hands saved'), findsOneWidget);
+
+    await tester.tap(find.text('Reset Training Progress'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, 'Reset'));
+    await tester.pumpAndSettle();
+    expect(DrillProgress.current.records[DrillKind.outs]!.answered, 0);
+    expect(find.text('No drills answered yet'), findsOneWidget);
   });
 
   testWidgets('a drill session runs to the summary', (tester) async {

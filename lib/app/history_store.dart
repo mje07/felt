@@ -34,6 +34,21 @@ class HistoryStore {
 
   factory HistoryStore.memory() => HistoryStore._(null);
 
+  /// Permanently deletes every saved hand (and with it all statistics).
+  Future<void> clear() async {
+    hands.clear();
+    final f = _file;
+    if (f == null) return;
+    try {
+      if (await f.exists()) await f.delete();
+    } catch (_) {
+      // Fall back to emptying it.
+      try {
+        await f.writeAsString('', flush: true);
+      } catch (_) {}
+    }
+  }
+
   Future<void> add(HandHistory h) async {
     hands.add(h);
     if (hands.length > _keep) hands.removeAt(0);

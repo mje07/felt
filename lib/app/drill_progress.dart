@@ -44,6 +44,15 @@ class DrillProgress extends ChangeNotifier {
   final SharedPreferences? _prefs;
   final Map<DrillKind, DrillRecord> records = {for (final k in DrillKind.values) k: DrillRecord()};
 
+  /// Clears every drill's answers and best streak.
+  void reset() {
+    for (final k in DrillKind.values) {
+      records[k] = DrillRecord();
+    }
+    _prefs?.remove('drills');
+    notifyListeners();
+  }
+
   void record(DrillKind kind, {required bool correct, required int streak}) {
     final r = records[kind]!;
     r.answered++;

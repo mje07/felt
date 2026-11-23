@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
               IconPill(
                 icon: CupertinoIcons.gear_alt,
                 tooltip: 'Settings',
-                onPressed: () => showPanel(context, title: 'Settings', builder: (_) => const SettingsPanel()),
+                onPressed: () => showPanel(context, title: 'Settings', builder: (_) => SettingsPanel(history: widget.history)).then((_) => setState(() {})),
               ),
             ]),
           ),
