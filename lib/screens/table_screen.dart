@@ -182,7 +182,7 @@ class _TopBar extends StatelessWidget {
                     ),
                   );
               return Row(children: [
-                if (acc != null && SettingsScope.of(context).coachEnabled)
+                if (acc != null && SettingsScope.of(context).showCoachAtTable)
                   readout('ACCURACY', Text('${acc.round()}%', style: Typo.number(p.label, size: 15))),
                 readout(
                   'SESSION',
@@ -195,8 +195,6 @@ class _TopBar extends StatelessWidget {
               ]);
             },
           ),
-          const _CoachToggle(),
-          const SizedBox(width: Space.s),
           IconPill(
             icon: CupertinoIcons.chart_bar_alt_fill,
             tooltip: 'Statistics',
@@ -261,38 +259,6 @@ class _BustOverlay extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Turns the coach's assessments on or off without leaving the table.
-class _CoachToggle extends StatelessWidget {
-  const _CoachToggle();
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Palette.of(context);
-    final s = SettingsScope.of(context);
-    return Semantics(
-      label: 'Coach assessments',
-      toggled: s.coachEnabled,
-      child: GlassPanel(
-        radius: Radii.pill,
-        padding: const EdgeInsets.fromLTRB(12, 2, 4, 2),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(s.coachEnabled ? CupertinoIcons.lightbulb_fill : CupertinoIcons.lightbulb_slash,
-              size: 16, color: s.coachEnabled ? p.accent : p.tertiaryLabel),
-          const SizedBox(width: 6),
-          Text('Coach', style: Typo.callout(p.label)),
-          Transform.scale(
-            scale: 0.75,
-            child: CupertinoSwitch(
-              value: s.coachEnabled,
-              onChanged: (v) => s.update((s) => s.coachEnabled = v),
-            ),
-          ),
-        ]),
       ),
     );
   }

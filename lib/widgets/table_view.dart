@@ -538,7 +538,7 @@ class HeroSeat extends StatelessWidget {
             child: Center(
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 _ActionTag(text: seat.label, winner: seat.winner),
-                if (SettingsScope.of(context).showGradesLive && SettingsScope.of(context).coachEnabled && seat.grade != null && seat.label != null) ...[
+                if (SettingsScope.of(context).showGradesLive && SettingsScope.of(context).showCoachAtTable && seat.grade != null && seat.label != null) ...[
                   const SizedBox(width: 6),
                   GradeBadge(grade: seat.grade!, compact: true),
                 ],

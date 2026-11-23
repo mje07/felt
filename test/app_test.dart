@@ -78,7 +78,7 @@ void main() {
     await tester.pump(const Duration(seconds: 10));
   });
 
-  testWidgets('the coach can be switched off mid-game from the top bar', (tester) async {
+  testWidgets('hiding the coach mid-game keeps grading for stats', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -114,20 +114,26 @@ void main() {
     }
     expect(history.hands.any((h) => h.reviews.isNotEmpty), isTrue);
 
-    // Flip the switch in the top bar.
-    expect(find.text('Coach'), findsOneWidget);
-    await tester.tap(find.descendant(of: find.ancestor(of: find.text('Coach'), matching: find.byType(Row)).first,
-        matching: find.byType(CupertinoSwitch)));
+    expect(find.text('ACCURACY'), findsOneWidget);
+
+    // Hide the coach mid-game (as the Settings switch does).
+    settings.update((s) => s.showCoachAtTable = false);
     await tester.pump();
-    expect(settings.coachEnabled, isFalse);
     expect(find.text('ACCURACY'), findsNothing);
+    expect(find.text('Coach'), findsNothing, reason: 'no coach control in the top bar');
 
     final before = history.hands.length;
-    await playUntil(before + 3);
-    // The hand in progress when switching may be finished without grades;
-    // every later hand must have none.
-    expect(history.hands.skip(before).every((h) => h.reviews.isEmpty), isTrue);
-    expect(find.text('Review Hand'), findsNothing);
+    var sawReviewButton = false;
+    for (var i = 0; i < 4000 && history.hands.length < before + 3; i++) {
+      await playUntil(history.hands.length + 1);
+      if (find.text('Review Hand').evaluate().isNotEmpty) sawReviewButton = true;
+    }
+    expect(sawReviewButton, isFalse);
+    expect(find.text('ACCURACY'), findsNothing);
+    // Grades are still recorded for the stats.
+    final later = history.hands.skip(before).toList();
+    expect(later.length, greaterThanOrEqualTo(3));
+    expect(later.any((h) => h.reviews.isNotEmpty), isTrue);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 10));

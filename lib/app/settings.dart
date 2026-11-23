@@ -48,8 +48,9 @@ class Settings extends ChangeNotifier {
   /// Show the coach's grade on each of your actions as you play.
   bool showGradesLive = false;
 
-  /// Whether the coach analyses and grades your decisions at all.
-  bool coachEnabled = true;
+  /// Show accuracy and coach grades at the table. Grading always runs in the
+  /// background so statistics stay complete; this only controls display.
+  bool showCoachAtTable = true;
 
   void _read() {
     final p = _prefs;
@@ -62,7 +63,7 @@ class Settings extends ChangeNotifier {
     soundEnabled = p.getBool('sound') ?? true;
     volume = p.getDouble('volume') ?? 0.8;
     showGradesLive = p.getBool('gradesLive') ?? false;
-    coachEnabled = p.getBool('coach') ?? true;
+    showCoachAtTable = p.getBool('coachAtTable') ?? true;
     playerName = p.getString('playerName') ?? 'You';
   }
 
@@ -78,7 +79,7 @@ class Settings extends ChangeNotifier {
       p.setBool('sound', soundEnabled);
       p.setDouble('volume', volume);
       p.setBool('gradesLive', showGradesLive);
-      p.setBool('coach', coachEnabled);
+      p.setBool('coachAtTable', showCoachAtTable);
       p.setString('playerName', playerName);
     }
     notifyListeners();

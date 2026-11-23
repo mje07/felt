@@ -96,7 +96,8 @@ class ActionBarState extends State<ActionBar> {
   }
 
   Widget _nextHand(BuildContext context) {
-    final reviews = c.lastHandReviews;
+    // Grades are still recorded when hidden; only the button is suppressed.
+    final reviews = SettingsScope.of(context).showCoachAtTable ? c.lastHandReviews : const <DecisionReview>[];
     return GlassPanel(
       key: const ValueKey('next'),
       radius: Radii.pill,
