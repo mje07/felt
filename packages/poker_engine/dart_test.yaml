@@ -1,0 +1,3 @@
+tags:
+  slow:
+    skip: "Exhaustive check; run with: dart test --run-skipped -t slow"
