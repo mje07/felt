@@ -78,6 +78,61 @@ void main() {
     await tester.pump(const Duration(seconds: 10));
   });
 
+  testWidgets('the coach can be switched off mid-game from the top bar', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final settings = Settings.memory()..speed = GameSpeed.quick;
+    final history = HistoryStore.memory();
+    await tester.pumpWidget(_host(
+      settings,
+      TableScreen(
+        config: const TableConfig(seats: 3, difficulty: Difficulty.casual),
+        history: history,
+        useIsolates: false,
+      ),
+    ));
+
+    Future<void> playUntil(int hands) async {
+      for (var i = 0; i < 4000 && history.hands.length < hands; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        final rebuy = find.textContaining('Rebuy');
+        if (rebuy.evaluate().isNotEmpty) await tester.tap(rebuy.first, warnIfMissed: false);
+        for (final label in ['Check', 'Call', 'Call All-in', 'Deal Next Hand']) {
+          final f = find.descendant(of: find.byType(ActionBar), matching: find.text(label));
+          if (f.evaluate().isNotEmpty) {
+            await tester.tap(f.first, warnIfMissed: false);
+            break;
+          }
+        }
+      }
+    }
+
+    // Coach on: wait for a graded hand.
+    for (var n = 1; n <= 8 && !history.hands.any((h) => h.reviews.isNotEmpty); n++) {
+      await playUntil(n);
+    }
+    expect(history.hands.any((h) => h.reviews.isNotEmpty), isTrue);
+
+    // Flip the switch in the top bar.
+    expect(find.text('Coach'), findsOneWidget);
+    await tester.tap(find.descendant(of: find.ancestor(of: find.text('Coach'), matching: find.byType(Row)).first,
+        matching: find.byType(CupertinoSwitch)));
+    await tester.pump();
+    expect(settings.coachEnabled, isFalse);
+    expect(find.text('ACCURACY'), findsNothing);
+
+    final before = history.hands.length;
+    await playUntil(before + 3);
+    // The hand in progress when switching may be finished without grades;
+    // every later hand must have none.
+    expect(history.hands.skip(before).every((h) => h.reviews.isEmpty), isTrue);
+    expect(find.text('Review Hand'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 10));
+  });
+
   testWidgets('a drill session runs to the summary', (tester) async {
     tester.view.physicalSize = const Size(1400, 1000);
     tester.view.devicePixelRatio = 1;

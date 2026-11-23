@@ -260,9 +260,9 @@ class GameController extends ChangeNotifier {
         view.toAct = s.toAct;
         _notify();
         final heroTurn = s.toAct == heroSeat;
-        final analysis = heroTurn ? _analyze(s) : null;
+        final analysis = heroTurn && settings.coachEnabled ? _analyze(s) : null;
         final action = heroTurn ? await _askHero(s) : await _askBot(s);
-        if (analysis != null && !_disposed) {
+        if (analysis != null && !_disposed && settings.coachEnabled) {
           try {
             final review = gradeDecision(await analysis, action);
             if (review != null) {
@@ -289,6 +289,8 @@ class GameController extends ChangeNotifier {
       }
       if (_disposed) return;
       game.settle(s);
+      // Turning the coach off mid-hand discards that hand's grades.
+      if (!settings.coachEnabled) _handReviews.clear();
       lastHandReviews = List.unmodifiable(_handReviews);
       unawaited(history.add(HandHistory.fromState(s, heroSeat: heroSeat, reviews: lastHandReviews)));
 
