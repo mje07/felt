@@ -64,6 +64,23 @@ flutter test
 flutter test test_screenshots --dart-define=OUT=build/screenshots
 ```
 
+### Windows installer
+
+```powershell
+powershell -ExecutionPolicy Bypass -File installer\build_installer.ps1
+```
+
+This builds the release and packages `build\installer\Felt-Setup-<version>.exe` with Inno Setup 6 (`winget install JRSoftware.InnoSetup`). The version comes from `pubspec.yaml`.
+The installer:
+- installs per-user by default, with no admin prompt (all users is an option in the wizard)
+- adds a Start-menu shortcut, and an optional desktop shortcut
+- registers an uninstaller in Settings → Apps
+- bundles the Visual C++ runtime, so it works on a clean PC
+- leaves your saved hands, stats and bankroll in place when you uninstall
+
+The installer isn't code-signed, so SmartScreen shows "Windows protected your PC" the first time (More info → Run anyway). A code-signing certificate removes that.
+The app icon comes from `tool/icon/` (`flutter test tool/icon/render_icon_test.dart`, then `dart tool/icon/make_ico.dart`).
+
 Windows needs Visual Studio (or Build Tools) with the *Desktop development with C++* workload, plus **Developer Mode** turned on (plugins need symlinks).
 Linux needs `clang cmake ninja-build pkg-config libgtk-3-dev`.
 
