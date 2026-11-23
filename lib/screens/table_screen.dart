@@ -105,8 +105,8 @@ class _TableScreenState extends State<TableScreen> {
               ),
             ),
             Positioned.fill(
-              top: 64,
-              bottom: 150,
+              top: 80,
+              bottom: 144,
               child: PokerTable(controller: c),
             ),
             Positioned(top: 0, left: 0, right: 0, child: _TopBar(controller: c, history: widget.history)),
