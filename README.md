@@ -2,7 +2,7 @@
 
 A clean, Apple-inspired No-Limit Texas Hold'em table for **Windows and Linux**.
 Website: https://mje07.github.io/felt/
-Play cash games and Sit & Gos against adaptive AI opponents, study spots with a built-in game-theory solver, and analyse your real online hands. Built with Flutter, so it ships native desktop binaries with no Electron or webview.
+Play cash games, Sit & Gos and multi-table tournaments against adaptive AI opponents, or host a home game for friends. Learn with lessons, a daily plan and a career mode; study spots with a built-in game-theory solver; and analyse your real online hands. Built with Flutter, so it ships native desktop binaries with no Electron or webview.
 
 ## Layout
 
@@ -12,6 +12,9 @@ Play cash games and Sit & Gos against adaptive AI opponents, study spots with a 
 | `lib/app/` | Theme tokens, persisted settings, hand-history store, and `GameController`, which runs the hand loop and replays engine events so the UI can animate them. |
 | `lib/widgets/` | Vector playing cards, chips, seats, table geometry, action bar. |
 | `lib/screens/` | Lobby, table, settings and history panels. |
+| `lib/net/` | Home games: the protocol, host, client, LAN discovery and the relay link. |
+| `lib/learn/` | Lesson content for the learning path. |
+| `server/relay/` | The invite-code relay server (standalone Dart, with a Dockerfile and Fly.io config). |
 | `test_screenshots/` | Renders the real UI to PNG for visual review. |
 | `tool/gen_sounds.dart` | Synthesizes the sound effects in `assets/sounds/` (procedural, so there are no sample licences). |
 
@@ -34,6 +37,35 @@ Players who bust in the same hand are placed by their stack at the start of that
 **Tournament coaching:**
 - At 15 big blinds or fewer, unopened spots are graded against push/fold charts.
 - Calling an all-in is graded on chip outcomes in cash games and on prize equity (ICM, `icm.dart`) in tournaments. Near the bubble, a call that wins chips on average can still lose prize money, and the coach says so.
+
+
+## Multi-table tournaments
+
+Fields of 18 to 180 players at 9-handed tables, from a free daily freeroll to The Big One (1,000,000 buy-in). Each event has its own speed, starting stack and, for the big ones, a guaranteed prize pool.
+- **Tables:** your table is played out hand by hand. The others are simulated with the same bots and rules, on the same blind clock.
+- **Balancing:** after each hand, players move from the biggest table to the smallest until sizes are within one, and tables break when the others can absorb them. The final table forms at 9.
+- **Dead button:** the big blind always moves forward one seat, so nobody skips or pays it twice when players bust (TDA rules).
+- **Payouts:** about 15% of the field is paid, on a decreasing curve.
+- **At the table:** the header shows your level, blinds, rank and the average stack, and a field panel lists chip leaders and the payout ladder. When you bust, the rest is simulated so the results name the winner.
+
+## Learning path
+
+- **Lessons:** 24 lessons in 6 units, from pot odds to ICM and hand reading. Each ends with questions, and figures are drawn with the real cards and range grids. `test/lessons_test.dart` checks every factual claim against the engine.
+- **Skill ratings:** an Elo-style rating for each of 7 skills, updated by lesson questions, drills, Spot Trainer decisions and graded hands at the table.
+- **Today's plan:** up to four activities a day, mixing spaced-repetition reviews (SM-2), the next lesson, your biggest leak and your weakest skill.
+- **Career mode:** a separate bankroll that starts at micro stakes. Promotion through 6 stages needs both chips and skill ratings, and ends at The Big One.
+- **Achievements:** 26 of them.
+
+## Play with friends
+
+One player hosts. Their Felt deals and runs the game with the real engine, and friends play from their own PCs.
+- **Joining:** games on the same network appear in "Join a game" (UDP broadcast on port 47111). Anyone can join by address and port (TCP 47110), for example over port forwarding or a VPN such as Tailscale. With an invite-code server set, friends anywhere can join with a 6-letter code.
+- **Fair by design:** each player is only ever sent their own hole cards, and other hands only when they're shown down. Friends send intended actions, which the host checks with the rules engine.
+- **Coach included:** each friend's Felt rebuilds the hand from the host's messages, so their coach grades their own decisions and the hands are saved to their own history.
+- **Games:** cash (free rebuys) or a Sit & Go, with bots in empty seats if you like (a Sit & Go always fills them), and a 15–60 second action timer (check if possible, otherwise fold). If a friend drops, they can reconnect to the same seat.
+- **Play chips only:** home games never touch your bankroll.
+
+**Invite codes** go through a small relay in `server/relay/` that you deploy yourself (Fly.io's free allowance is enough; see its README). The relay only forwards messages and stores nothing, but it does carry the traffic, so use one you run or trust.
 
 ## Statistics
 
@@ -103,7 +135,10 @@ dart run tool/arena.dart --deals 20000 --difficulty expert  # bot strength, dupl
 dart test --run-skipped -t slow test/bot_strength_test.dart
 dart compile exe tool/solver_bench.dart -o build/solver_bench.exe  # solver timings
 
-# app
+# relay
+cd ../../server/relay && dart test
+
+# app (from the repo root)
 flutter test
 flutter test test_screenshots --dart-define=OUT=build/screenshots
 ```
@@ -128,7 +163,7 @@ The app icon comes from `tool/icon/` (`flutter test tool/icon/render_icon_test.d
 
 ### Updates
 
-`lib/app/updater.dart` asks GitHub for the latest release when Felt starts, then every 6 hours. This is Felt's only network request, and it sends nothing about the player or their games. It can be turned off in Settings → Updates.
+`lib/app/updater.dart` asks GitHub for the latest release when Felt starts, then every 6 hours. It sends nothing about the player or their games, and it can be turned off in Settings → Updates. Apart from this, Felt only uses the network when you host or join a game with friends.
 
 - **Windows, installed with Setup.exe:** the new installer downloads in the background. It's only used if it comes from this repository's releases and its SHA-256 matches the digest GitHub publishes for it, and it's checked again before it runs.
   - It installs silently the next time Felt starts, or straight away with "Restart to update".

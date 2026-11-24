@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Felt Poker</title>
-<meta name="description" content="Felt is a clean, offline No-Limit Texas Hold'em app for Windows and Linux, with AI opponents and a coach that grades every decision.">
+<meta name="description" content="Felt is a clean No-Limit Texas Hold'em app for Windows and Linux: AI opponents, tournaments, home games with friends, lessons and a coach that grades every decision.">
 <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="Felt Poker">
-<meta property="og:description" content="Offline No-Limit Hold'em with a built-in coach. Windows and Linux.">
+<meta property="og:description" content="No-Limit Hold'em with a built-in coach, tournaments and home games. Windows and Linux.">
 <meta property="og:image" content="assets/shots/table_dark_decision.png">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/icon.png">
@@ -34,8 +34,9 @@
     <nav class="nav-links">
       <a class="hide-sm" href="#solver">Solver</a>
       <a class="hide-sm" href="#coach">Coach</a>
-      <a class="hide-sm" href="#stats">Statistics</a>
-      <a class="hide-sm" href="#tournaments">Sit &amp; Go</a>
+      <a class="hide-sm" href="#friends">Friends</a>
+      <a class="hide-sm" href="#learn">Learn</a>
+      <a class="hide-sm" href="#tournaments">Tournaments</a>
       <a href="https://github.com/mje07/felt">GitHub</a>
       <a class="pill primary small" href="#download">Download</a>
     </nav>
@@ -55,7 +56,7 @@
         <a class="pill primary" href="#download">Download for Windows<small>Installer · 12 MB</small></a>
         <a class="pill secondary" href="https://github.com/mje07/felt">View on GitHub<small>Linux · build from source</small></a>
       </div>
-      <p class="meta"><span>Free and open source</span><span>Plays offline</span><span>No account</span></p>
+      <p class="meta"><span>Free and open source</span><span>Plays offline or with friends</span><span>No account</span></p>
 
       <div class="window reveal">
         <div class="bar">Felt<i></i><i></i><i></i><i></i></div>
@@ -76,7 +77,49 @@
         <div class="tile reveal"><div class="k">Opponents</div><div class="v">5 styles</div><p>Rock, Shark, Maverick, Station and Wildcard, at three skill levels.</p></div>
         <div class="tile reveal"><div class="k">Coach</div><div class="v">Every decision</div><p>Graded Best to Blunder, with the reason and the better play.</p></div>
         <div class="tile reveal"><div class="k">Study</div><div class="v">Built-in solver</div><p>Solve spots, train against the solver, and test ranges in the Equity Lab.</p></div>
-        <div class="tile reveal"><div class="k">Modes</div><div class="v">Cash &amp; Sit &amp; Go</div><p>Stakes from 1/2 to 100/200, or 2–9 player tournaments.</p></div>
+        <div class="tile reveal"><div class="k">Modes</div><div class="v">Cash to 180 players</div><p>Cash games, Sit &amp; Gos, multi-table tournaments, and home games with friends.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="friends">
+    <div class="wrap feature flip">
+      <div class="copy reveal">
+        <p class="eyebrow">Play with friends</p>
+        <h2>Your home game, on your own PCs.</h2>
+        <p class="sub">Host a table and friends join from their own computers: on the same network, by address, or from anywhere with a six-letter invite code.</p>
+        <ul>
+          <li><svg><use href="#check"/></svg><span><b>Fair by design.</b> The host's Felt deals, and each player is only ever sent their own cards.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>Your coach comes too.</b> Every friend's decisions are graded on their own PC and saved to their own history.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>Cash or Sit &amp; Go.</b> Bots in empty seats if you like, an action timer, and reconnecting to your seat if you drop. Play chips only.</span></li>
+        </ul>
+      </div>
+      <div class="shot crop-friends reveal">
+        <picture>
+          <source srcset="assets/shots/friends_dark.png" media="(prefers-color-scheme: dark)">
+          <img src="assets/shots/friends_light.png" loading="lazy" alt="The Play with friends screen: host a table with a name, cash or Sit &amp; Go, seats, stakes, bots in empty seats and an action timer.">
+        </picture>
+      </div>
+    </div>
+  </section>
+
+  <section id="learn">
+    <div class="wrap feature">
+      <div class="copy reveal">
+        <p class="eyebrow">Learn</p>
+        <h2>A course, a plan for today, and a career to climb.</h2>
+        <p class="sub">24 lessons take you from pot odds to ICM, with real cards and range grids, then check you understood.</p>
+        <ul>
+          <li><svg><use href="#check"/></svg><span><b>Skill ratings.</b> Seven skills, each rated from every lesson question, drill, trainer spot and graded hand.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>Today's plan.</b> Spaced-repetition reviews, the next lesson, your biggest leak and your weakest skill, in about 20 minutes.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>Career mode.</b> Start at micro stakes with 2,000 chips. Promotion needs both chips and skill, all the way to The Big One.</span></li>
+        </ul>
+      </div>
+      <div class="shot crop-learn reveal">
+        <picture>
+          <source srcset="assets/shots/learn_dark.png" media="(prefers-color-scheme: dark)">
+          <img src="assets/shots/learn_light.png" loading="lazy" alt="The Learn screen: today's plan with four activities and a streak, skill ratings for seven skills, and a Career mode banner.">
+        </picture>
       </div>
     </div>
   </section>
@@ -241,18 +284,19 @@
   <section id="tournaments">
     <div class="wrap feature">
       <div class="copy reveal">
-        <p class="eyebrow">Sit &amp; Go</p>
-        <h2>Buy in. Outlast the table.</h2>
-        <p class="sub">Single-table tournaments for 2 to 9 players with rising blinds and antes. Winner takes all, or pay the top places.</p>
+        <p class="eyebrow">Tournaments</p>
+        <h2>From a free daily freeroll to The Big One.</h2>
+        <p class="sub">Multi-table tournaments of up to 180 players, with buy-ins up to 1,000,000 and guaranteed prize pools as big as 50 million. Or a quick single-table Sit &amp; Go.</p>
         <ul>
+          <li><svg><use href="#check"/></svg><span><b>The real thing.</b> Tables balance and break as players bust, the button follows the dead-button rule, and the final table forms at nine.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>Know where you stand.</b> Level, blinds, players left, average stack, your rank and the payout ladder, always one glance away.</span></li>
           <li><svg><use href="#check"/></svg><span><b>One bankroll.</b> Buy-ins, prizes and cash-game winnings all move the same balance.</span></li>
-          <li><svg><use href="#check"/></svg><span><b>Hyper, Turbo or Regular.</b> Blinds rise every 5, 8 or 12 hands, from 1,000, 1,500 or 3,000 chips.</span></li>
         </ul>
       </div>
-      <div class="shot crop-sng reveal">
+      <div class="shot reveal">
         <picture>
-          <source srcset="assets/shots/sng_results_dark.png" media="(prefers-color-scheme: dark)">
-          <img src="assets/shots/sng_results_light.png" loading="lazy" alt="Sit &amp; Go results over the table: You finished 5th of 6, with Lobby and Play Again buttons.">
+          <source srcset="assets/shots/mtt_table_dark.png" media="(prefers-color-scheme: dark)">
+          <img src="assets/shots/mtt_table_light.png" loading="lazy" alt="A Sunday Million table at level 7: 115 of 180 players left on 13 tables, a 1,000,000 prize pool, and the action on you.">
         </picture>
       </div>
     </div>
