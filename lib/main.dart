@@ -1,14 +1,19 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 
+import 'app/achievements.dart';
 import 'app/bankroll.dart';
+import 'app/career.dart';
 import 'app/drill_progress.dart';
 import 'app/history_store.dart';
+import 'app/learn_progress.dart';
 import 'app/settings.dart';
+import 'app/skills.dart';
 import 'app/sounds.dart';
 import 'app/theme.dart';
 import 'app/tournament_store.dart';
 import 'app/updater.dart';
 import 'screens/home_screen.dart';
+import 'widgets/achievement_toast.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +22,13 @@ Future<void> main() async {
   final sounds = await SoloudSounds.start(settings);
   await DrillProgress.load();
   await Bankroll.load();
+  await Bankroll.loadCareer();
+  await SkillRatings.load();
+  await LearnProgress.load();
+  await Career.load();
+  await Achievements.load();
   await TournamentStore.open();
+  Achievements.current.evaluate(hands: history.hands);
   await Updater.start(settings);
   runApp(FeltApp(settings: settings, history: history, sounds: sounds));
 }
@@ -55,7 +66,7 @@ class FeltApp extends StatelessWidget {
             ),
             builder: (context, child) => DefaultTextStyle(
               style: TextStyle(fontFamily: Typo.family, color: Palette.of(context).label),
-              child: child!,
+              child: Stack(children: [child!, const AchievementToast()]),
             ),
             home: HomeScreen(history: history),
           );

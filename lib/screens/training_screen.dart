@@ -4,7 +4,10 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:poker_engine/poker_engine.dart';
 
+import '../app/achievements.dart';
 import '../app/drill_progress.dart';
+import '../app/learn_progress.dart';
+import '../app/skills.dart';
 import '../app/history_store.dart';
 import '../app/sounds.dart';
 import '../app/theme.dart';
@@ -263,6 +266,7 @@ class _SessionState extends State<_Session> {
       }
     });
     DrillProgress.current.record(widget.kind, correct: right, streak: _streak);
+    SkillRatings.current.recordDrill(widget.kind, correct: right);
     SoundsScope.of(context).play(right ? Sfx.chip : Sfx.fold);
   }
 
@@ -271,6 +275,8 @@ class _SessionState extends State<_Session> {
     setState(() {
       if (_index + 1 >= length) {
         _done = true;
+        LearnProgress.current.recordActivity('drill:${widget.kind.name}', _correct / length);
+        Achievements.current.evaluate(hands: const []);
       } else {
         _index++;
         _picked = null;

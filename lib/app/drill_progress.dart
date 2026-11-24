@@ -21,6 +21,7 @@ class DrillProgress extends ChangeNotifier {
 
   /// The app-wide instance (replaced at startup by [load]).
   static DrillProgress current = DrillProgress._(null);
+  factory DrillProgress.memory() => DrillProgress._(null);
 
   static Future<DrillProgress> load() async {
     SharedPreferences? prefs;

@@ -22,6 +22,7 @@ class TableScreen extends StatefulWidget {
     required this.history,
     this.useIsolates = true,
     this.onController,
+    this.bankroll,
   });
   final TableConfig config;
   final HistoryStore history;
@@ -29,6 +30,9 @@ class TableScreen extends StatefulWidget {
 
   /// Exposes the controller (tests, screenshots).
   final ValueChanged<GameController>? onController;
+
+  /// Which bankroll pays the buy-in (career mode has its own).
+  final Bankroll? bankroll;
 
   @override
   State<TableScreen> createState() => _TableScreenState();
@@ -48,6 +52,7 @@ class _TableScreenState extends State<TableScreen> {
       history: widget.history,
       useIsolates: widget.useIsolates,
       sounds: SoundsScope.of(context),
+      bankroll: widget.bankroll,
     )..start();
     widget.onController?.call(_controller!);
   }

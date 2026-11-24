@@ -5,6 +5,7 @@ import 'package:poker_engine/poker_engine.dart';
 
 import 'package:file_selector/file_selector.dart';
 
+import '../app/achievements.dart';
 import '../app/history_store.dart';
 import '../app/importer.dart';
 import '../app/theme.dart';
@@ -117,6 +118,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
         },
       );
       final added = await widget.store.addAll(result.hands);
+      Achievements.current.evaluate(hands: widget.store.hands);
       final dupes = result.hands.length - added;
       _message = result.hands.isEmpty && result.skipped.isEmpty
           ? 'No PokerStars or GGPoker hands found in ${files.length == 1 ? 'that file' : 'those files'}.'
@@ -186,6 +188,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
                 children: [
                   Positioned.fill(child: ColoredBox(color: p.separator)),
                   FractionallySizedBox(
+                    heightFactor: 1,
                     widthFactor: _total == 0 ? 0 : _done / _total,
                     child: ColoredBox(color: p.accent),
                   ),

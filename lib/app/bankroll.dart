@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'career.dart';
+
 enum LedgerKind { start, buyIn, rebuy, cashOut, prize, topUp, reset }
 
 class LedgerEntry {
@@ -35,7 +37,17 @@ class LedgerEntry {
 /// Chips sitting on a cash table are tracked as [inPlay] after every hand, so
 /// if the app closes mid-session they are returned on the next launch.
 class Bankroll extends ChangeNotifier {
-  Bankroll._(this._prefs);
+  Bankroll._(this._prefs, {this.storageKey = 'bankroll', this.start = startingBalance});
+
+  /// Where this bankroll is saved.
+  final String storageKey;
+
+  /// Balance a new or reset bankroll starts with.
+  final int start;
+
+  /// Career mode's own bankroll (replaced at startup by [loadCareer]).
+  static Bankroll career = Bankroll._(null, storageKey: 'careerBankroll', start: Career.startingBankroll)
+    ..balance = Career.startingBankroll;
 
   static const startingBalance = 10000;
   static const _keep = 400;
@@ -49,17 +61,22 @@ class Bankroll extends ChangeNotifier {
   final List<LedgerEntry> ledger = [];
 
   /// In-memory bankroll for tests.
-  factory Bankroll.memory([int balance = startingBalance]) => Bankroll._(null)..balance = balance;
+  factory Bankroll.memory([int balance = startingBalance]) => Bankroll._(null, start: balance)..balance = balance;
 
-  static Future<Bankroll> load() async {
+  static Future<Bankroll> load() async => current = await _load('bankroll', startingBalance);
+
+  static Future<Bankroll> loadCareer() async =>
+      career = await _load('careerBankroll', Career.startingBankroll);
+
+  static Future<Bankroll> _load(String key, int start) async {
     SharedPreferences? prefs;
     try {
       prefs = await SharedPreferences.getInstance();
     } catch (_) {}
-    final b = Bankroll._(prefs);
-    final raw = prefs?.getString('bankroll');
+    final b = Bankroll._(prefs, storageKey: key, start: start);
+    final raw = prefs?.getString(key);
     if (raw == null) {
-      b._add(LedgerKind.start, startingBalance, 'Starting bankroll', setBalance: true);
+      b._add(LedgerKind.start, start, 'Starting bankroll', setBalance: true);
     } else {
       try {
         final j = (jsonDecode(raw) as Map).cast<String, dynamic>();
@@ -69,12 +86,12 @@ class Bankroll extends ChangeNotifier {
           b.ledger.add(LedgerEntry.fromJson((e as Map).cast<String, dynamic>()));
         }
       } catch (_) {
-        b.balance = startingBalance;
+        b.balance = start;
       }
       // Chips left on a cash table when the app last closed.
       if (b.inPlay > 0) b.cashOut(b.inPlay, note: 'Recovered from last session');
     }
-    return current = b;
+    return b;
   }
 
   bool canAfford(int amount) => balance >= amount;
@@ -89,7 +106,7 @@ class Bankroll extends ChangeNotifier {
 
   void _save() {
     _prefs?.setString(
-        'bankroll',
+        storageKey,
         jsonEncode({
           'balance': balance,
           'inPlay': inPlay,
@@ -128,13 +145,13 @@ class Bankroll extends ChangeNotifier {
 
   /// Free top-up back to the starting balance when broke.
   void topUp() {
-    if (balance >= startingBalance) return;
-    _add(LedgerKind.topUp, startingBalance - balance, 'Top-up');
+    if (balance >= start) return;
+    _add(LedgerKind.topUp, start - balance, 'Top-up');
   }
 
   void reset() {
     ledger.clear();
     inPlay = 0;
-    _add(LedgerKind.reset, startingBalance, 'Bankroll reset', setBalance: true);
+    _add(LedgerKind.reset, start, 'Bankroll reset', setBalance: true);
   }
 }

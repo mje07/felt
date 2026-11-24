@@ -20,6 +20,14 @@ import 'package:felt/screens/settings_panel.dart';
 import 'package:felt/screens/study_screen.dart';
 import 'package:felt/screens/spot_trainer_screen.dart';
 import 'package:felt/screens/replayer_screen.dart';
+import 'package:felt/screens/learn_screen.dart';
+import 'package:felt/screens/lesson_screen.dart';
+import 'package:felt/screens/career_screen.dart';
+import 'package:felt/learn/lessons.dart';
+import 'package:felt/app/learn_progress.dart';
+import 'package:felt/app/skills.dart';
+import 'package:felt/app/achievements.dart';
+import 'package:felt/app/career.dart';
 import 'package:flutter/services.dart';
 import 'package:felt/screens/stats_screen.dart';
 import 'package:felt/screens/training_screen.dart';
@@ -80,6 +88,7 @@ void main() {
   trainerShots();
   importShots();
   mttShots();
+  learnShots();
   settingsShots();
   historyShots();
   sngShots();
@@ -646,6 +655,68 @@ void mttShots() {
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 10));
+    });
+  }
+}
+
+void learnShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+    testWidgets('learn $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1500);
+      tester.view.devicePixelRatio = 1;
+      LearnProgress.current = LearnProgress.memory();
+      SkillRatings.current = SkillRatings.memory();
+      Achievements.current = Achievements.memory();
+      final now = DateTime.now();
+      for (var d = 3; d >= 0; d--) {
+        LearnProgress.current.recordActivity('drill:outs', 0.9, now: now.subtract(Duration(days: d)));
+      }
+      LearnProgress.current.completeLesson('hand-ranks', 1, now: now.subtract(const Duration(days: 3)));
+      LearnProgress.current.completeLesson('position', 0.67, now: now.subtract(const Duration(days: 2)));
+      final rng = Random(4);
+      for (var i = 0; i < 60; i++) {
+        SkillRatings.current.record(Skill.maths, rng.nextDouble() < 0.8 ? 1 : 0);
+        SkillRatings.current.record(Skill.preflop, rng.nextDouble() < 0.6 ? 1 : 0);
+        SkillRatings.current.record(Skill.river, rng.nextDouble() < 0.4 ? 1 : 0);
+      }
+      Achievements.current
+        ..unlock(Achievement.firstHand)
+        ..unlock(Achievement.student)
+        ..fresh.clear();
+      await tester.pumpWidget(_themed(dark, LearnScreen(history: _simulatedHistory(120))));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'learn_$mode');
+    });
+
+    testWidgets('lesson $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      final lesson = lessonById('outs')!;
+      await tester.pumpWidget(_themed(dark, LessonScreen(lesson: lesson, history: HistoryStore.memory())));
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Check your understanding'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next question').evaluate().isEmpty ? find.text('9') : find.text('9'));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'lesson_$mode');
+    });
+
+    testWidgets('career $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1300);
+      tester.view.devicePixelRatio = 1;
+      Career.current = Career.memory()
+        ..start()
+        ..stage = 1;
+      Bankroll.career = Bankroll.memory(18400);
+      SkillRatings.current = SkillRatings.memory();
+      for (var i = 0; i < 30; i++) {
+        SkillRatings.current.record(Skill.preflop, 1);
+      }
+      await tester.pumpWidget(_themed(dark, const CareerScreen()));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'career_$mode');
     });
   }
 }

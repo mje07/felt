@@ -5,9 +5,12 @@ import 'dart:math';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:poker_engine/poker_engine.dart';
 
+import 'achievements.dart';
 import 'bankroll.dart';
+import 'career.dart';
 import 'history_store.dart';
 import 'settings.dart';
+import 'skills.dart';
 import 'sounds.dart';
 import 'theme.dart';
 import 'tournament_store.dart';
@@ -489,6 +492,7 @@ class GameController extends ChangeNotifier {
             if (review != null) {
               _handReviews.add(review);
               sessionReviews.add(review);
+              SkillRatings.current.recordReview(review);
               view.seats[heroSeat].grade = review.grade;
             }
           } catch (e) {
@@ -511,6 +515,7 @@ class GameController extends ChangeNotifier {
       if (_disposed) return;
       lastHandReviews = List.unmodifiable(_handReviews);
       reads.observe(s);
+      _checkAchievementsSoon();
       unawaited(history.add(HandHistory.fromState(
         s,
         heroSeat: heroSeat,
@@ -587,6 +592,22 @@ class GameController extends ChangeNotifier {
     return results.first! as PlayerAction;
   }
 
+
+  /// Checks achievements once the hand is saved (and after tournaments).
+  void _checkAchievementsSoon() {
+    scheduleMicrotask(() {
+      if (_disposed) return;
+      Achievements.current.evaluate(hands: history.hands);
+    });
+  }
+
+  /// Career mode: winning The Big One with the career bankroll.
+  void _careerResult(int place) {
+    if (identical(bankroll, Bankroll.career) && config.isMtt && config.eventName == 'The Big One' && place == 1) {
+      Career.current.crown();
+    }
+    _checkAchievementsSoon();
+  }
   // ---------------------------------------------------------------- multi-table
 
   int _playingMttLevel = 0;
@@ -690,6 +711,7 @@ class GameController extends ChangeNotifier {
       winnerName: winner == null ? '' : (winner == 0 ? 'You' : m.players[winner].name),
     );
     sounds.play(place == 1 ? Sfx.win : Sfx.collect);
+    _careerResult(place);
     _notify();
   }
 
@@ -722,6 +744,7 @@ class GameController extends ChangeNotifier {
       winnerName: winner == null ? '' : (winner == heroSeat ? 'You' : _players[winner].name),
     );
     sounds.play(place == 1 ? Sfx.win : Sfx.collect);
+    _careerResult(place);
     _notify();
   }
 

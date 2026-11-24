@@ -13,6 +13,7 @@ import '../widgets/controls.dart';
 import '../widgets/playing_card.dart';
 import 'equity_lab_screen.dart';
 import 'history_panel.dart';
+import 'learn_screen.dart';
 import 'panel_route.dart';
 import 'settings_panel.dart';
 import 'range_screen.dart';
@@ -326,6 +327,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         Wrap(
                           alignment: WrapAlignment.center,
                           children: [
+                          PillButton(
+                            label: 'Learn',
+                            style: PillStyle.plain,
+                            minWidth: 0,
+                            onPressed: () => Navigator.of(context)
+                                .push(CupertinoPageRoute<void>(builder: (_) => LearnScreen(history: widget.history)))
+                                .then((_) => setState(() {})),
+                          ),
                             PillButton(
                               label: 'Training',
                               style: PillStyle.plain,

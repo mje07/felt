@@ -7,6 +7,8 @@ import '../app/settings.dart';
 import '../app/sounds.dart';
 import '../app/theme.dart';
 import '../app/tournament_store.dart';
+import '../app/learn_progress.dart';
+import '../app/skills.dart';
 import '../app/updater.dart';
 import '../app/version.dart';
 import '../widgets/common.dart';
@@ -274,6 +276,20 @@ class _DataCardState extends State<_DataCard> {
     if (mounted) setState(() => _done = 'Bankroll was reset.');
   }
 
+  Future<void> _resetLearning() async {
+    final ok = await confirmAction(
+      context,
+      title: 'Reset learning progress?',
+      message: 'This clears finished lessons, your review schedule, your streak and your skill ratings. '
+          'Achievements are kept. This can\'t be undone.',
+      action: 'Reset',
+    );
+    if (!ok) return;
+    LearnProgress.current.reset();
+    SkillRatings.current.reset();
+    if (mounted) setState(() => _done = 'Learning progress was reset.');
+  }
+
   Future<void> _resetTraining() async {
     final ok = await confirmAction(
       context,
@@ -313,10 +329,17 @@ class _DataCardState extends State<_DataCard> {
           trailing: reset(answered > 0 ? _resetTraining : null),
         ),
         SettingRow(
+          label: 'Learning progress',
+          detail: LearnProgress.current.lessonsDone == 0 && SkillRatings.current.weakest.isEmpty
+              ? 'No lessons or ratings yet'
+              : '${LearnProgress.current.lessonsDone} lessons done · skill ratings · ${LearnProgress.current.streak}-day streak',
+          trailing: reset(LearnProgress.current.lessonsDone == 0 && SkillRatings.current.weakest.isEmpty ? null : _resetLearning),
+        ),
+        SettingRow(
           label: 'Tournament results',
           detail: TournamentStore.current.results.isEmpty
-              ? 'No Sit & Gos played yet'
-              : '${TournamentStore.current.results.length} Sit & Go${TournamentStore.current.results.length == 1 ? '' : 's'} saved',
+              ? 'No tournaments played yet'
+              : '${TournamentStore.current.results.length} tournament${TournamentStore.current.results.length == 1 ? '' : 's'} saved',
           trailing: reset(TournamentStore.current.results.isEmpty ? null : _resetTournaments),
         ),
         SettingRow(

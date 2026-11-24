@@ -5,7 +5,11 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:poker_engine/poker_engine.dart';
 
+import '../app/achievements.dart';
+import '../app/learn_progress.dart';
+import '../app/skills.dart';
 import '../app/solver_worker.dart';
+import '../learn/lessons.dart' show Skill;
 import '../app/theme.dart';
 import '../widgets/common.dart';
 import '../widgets/controls.dart';
@@ -39,7 +43,10 @@ class _Question {
 /// Play solved spots against an opponent who follows the solver, and get
 /// every decision graded by how much EV it gives up.
 class SpotTrainerScreen extends StatefulWidget {
-  const SpotTrainerScreen({super.key, this.hands = 10, this.random});
+  const SpotTrainerScreen({super.key, this.hands = 10, this.random, this.street});
+
+  /// Street to start on (from a plan or leak); the player can still change it.
+  final TrainerStreet? street;
 
   /// Hands per session.
   final int hands;
@@ -52,7 +59,7 @@ class SpotTrainerScreen extends StatefulWidget {
 class _SpotTrainerScreenState extends State<SpotTrainerScreen> {
   late final math.Random _rng = widget.random ?? math.Random();
   int _preset = 0;
-  TrainerStreet _street = TrainerStreet.river;
+  late TrainerStreet _street = widget.street ?? TrainerStreet.river;
   int? _side; // null = random, 0 = out of position, 1 = in position
   bool _running = false;
 
@@ -232,6 +239,15 @@ class _SpotTrainerScreenState extends State<SpotTrainerScreen> {
     });
   }
 
+
+  void _finishSession() {
+    final acc = accuracyOf(_reviews);
+    if (acc != null) {
+      LearnProgress.current.recordActivity('trainer:${_street.name}', acc / 100);
+      if (acc >= 90 && _reviews.length >= 5) Achievements.current.unlock(Achievement.solverApproved);
+    }
+    setState(() => _summary = true);
+  }
   Future<void> _act(int i) async {
     final q = _q!, v = _view!;
     final evs = await q.worker!.actionEvs(_path, q.heroCombo);
@@ -272,6 +288,7 @@ class _SpotTrainerScreenState extends State<SpotTrainerScreen> {
     }
     setState(() {
       if (review != null) _reviews.add(review);
+      if (review != null) SkillRatings.current.record(review.street == Street.river ? Skill.river : Skill.postflop, review.grade.score / 100);
       _lastReview = review;
       _log.add('You ${actionLabel(v.actions[i], v).toLowerCase()}');
       _path.add(i);
@@ -451,7 +468,7 @@ class _SpotTrainerScreenState extends State<SpotTrainerScreen> {
             child: PillButton(
               label: _handNo >= widget.hands ? 'See results' : 'Next hand',
               style: PillStyle.filled,
-              onPressed: _handNo >= widget.hands ? () => setState(() => _summary = true) : _nextHand,
+              onPressed: _handNo >= widget.hands ? _finishSession : _nextHand,
             ),
           ),
         ],
