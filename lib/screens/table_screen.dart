@@ -7,6 +7,8 @@ import '../app/history_store.dart';
 import '../app/settings.dart';
 import '../app/sounds.dart';
 import '../app/theme.dart';
+import '../net/client.dart';
+import '../net/host.dart';
 import '../widgets/action_bar.dart';
 import '../widgets/common.dart';
 import '../widgets/table_view.dart';
@@ -23,6 +25,8 @@ class TableScreen extends StatefulWidget {
     this.useIsolates = true,
     this.onController,
     this.bankroll,
+    this.host,
+    this.client,
   });
   final TableConfig config;
   final HistoryStore history;
@@ -33,6 +37,10 @@ class TableScreen extends StatefulWidget {
 
   /// Which bankroll pays the buy-in (career mode has its own).
   final Bankroll? bankroll;
+
+  /// Set for a game with friends: hosting it, or sitting at a friend's table.
+  final HomeGameHost? host;
+  final HomeGameClient? client;
 
   @override
   State<TableScreen> createState() => _TableScreenState();
@@ -53,6 +61,8 @@ class _TableScreenState extends State<TableScreen> {
       useIsolates: widget.useIsolates,
       sounds: SoundsScope.of(context),
       bankroll: widget.bankroll,
+      host: widget.host,
+      client: widget.client,
     )..start();
     widget.onController?.call(_controller!);
   }
@@ -375,6 +385,10 @@ class _ResultsOverlay extends StatelessWidget {
                     const SizedBox(height: Space.xs),
                     Text(subtitle, textAlign: TextAlign.center, style: Typo.body(p.secondaryLabel)),
                     const SizedBox(height: Space.xl),
+                    if (controller.config.homeGame)
+                      Text('A home game for play chips: your bankroll is untouched.',
+                          textAlign: TextAlign.center, style: Typo.callout(p.secondaryLabel))
+                    else
                     Row(children: [
                       _Figure('PRIZE', formatChips(o.prize)),
                       _Figure('BUY-IN', formatChips(o.buyIn)),
@@ -384,6 +398,7 @@ class _ResultsOverlay extends StatelessWidget {
                     const SizedBox(height: Space.xl),
                     Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       PillButton(label: 'Lobby', onPressed: () => Navigator.of(context).maybePop()),
+                      if (!controller.config.homeGame) ...[
                       const SizedBox(width: Space.s),
                       PillButton(
                         label: 'Play Again',
@@ -393,6 +408,7 @@ class _ResultsOverlay extends StatelessWidget {
                             ? () => Navigator.of(context).pushReplacement(tableRoute(controller.config, history))
                             : null,
                       ),
+                      ],
                     ]),
                   ],
                 ),

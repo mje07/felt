@@ -211,6 +211,7 @@ extension _HomeGame on GameController {
           _notify();
         case 'end':
           remoteEnded = m['reason'] as String? ?? 'The game is over.';
+          handOver = true;
           heroLegal = null;
           _notify();
           return;

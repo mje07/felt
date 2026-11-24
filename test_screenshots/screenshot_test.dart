@@ -23,6 +23,7 @@ import 'package:felt/screens/replayer_screen.dart';
 import 'package:felt/screens/learn_screen.dart';
 import 'package:felt/screens/lesson_screen.dart';
 import 'package:felt/screens/career_screen.dart';
+import 'package:felt/screens/friends_screen.dart';
 import 'package:felt/learn/lessons.dart';
 import 'package:felt/app/learn_progress.dart';
 import 'package:felt/app/skills.dart';
@@ -718,5 +719,6 @@ void learnShots() {
       await tester.pumpAndSettle();
       await _snap(tester, 'career_$mode');
     });
+testWidgets('friends $mode', (tester) async {      tester.view.physicalSize = const Size(1280, 1100);      tester.view.devicePixelRatio = 1;      await tester.pumpWidget(_themed(dark, FriendsScreen(history: HistoryStore.memory())));      await tester.pumpAndSettle();      await _snap(tester, 'friends_$mode');      await tester.tap(find.text('Join a game'));      await tester.pumpAndSettle();      await _snap(tester, 'friends_join_$mode');    });
   }
 }

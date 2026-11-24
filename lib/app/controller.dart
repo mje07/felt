@@ -427,7 +427,7 @@ class GameController extends ChangeNotifier {
   }
 
   /// Whether the bankroll covers a cash-game rebuy.
-  bool get canAffordRebuy => bankroll.canAfford(config.buyIn - hero.stack);
+  bool get canAffordRebuy => config.homeGame || bankroll.canAfford(config.buyIn - hero.stack);
 
   void rebuy() {
     final amount = config.buyIn - hero.stack;
@@ -771,7 +771,7 @@ class GameController extends ChangeNotifier {
     // If the player is out, play the rest out instantly to name the winner.
     winner ??= useIsolates ? await _simulateWinner(t) : (t..simulateRest()).winner;
     final prize = t.prizeFor(heroSeat);
-    if (prize > 0) bankroll.credit(prize, note: 'Sit & Go ${ordinal(place)}');
+    if (prize > 0 && !config.homeGame) bankroll.credit(prize, note: 'Sit & Go ${ordinal(place)}');
     if (!config.homeGame) {
     unawaited(tournaments.add(TournamentResult(
       at: DateTime.now(),

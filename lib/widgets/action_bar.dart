@@ -114,13 +114,21 @@ class ActionBarState extends State<ActionBar> {
             ),
             const SizedBox(width: 6),
           ],
-          PillButton(
-            label: 'Deal Next Hand',
-            shortcut: 'Space',
-            style: PillStyle.filled,
-            minWidth: 220,
-            onPressed: c.dealNext,
-          ),
+          if (c.client != null)
+            PillButton(
+              label: c.remoteEnded ?? 'Waiting for ${c.client!.hostName} to deal',
+              style: PillStyle.plain,
+              minWidth: 220,
+              onPressed: null,
+            )
+          else
+            PillButton(
+              label: 'Deal Next Hand',
+              shortcut: 'Space',
+              style: PillStyle.filled,
+              minWidth: 220,
+              onPressed: c.dealNext,
+            ),
         ],
       ),
     );
