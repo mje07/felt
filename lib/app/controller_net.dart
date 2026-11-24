@@ -38,18 +38,22 @@ extension _HomeGame on GameController {
     Future<DecisionAnalysis>? analysis;
     int? turnHand;
     var handOverSaved = true;
+    var heroDealt = false;
 
     Future<void> finishHand(HandState done) async {
       if (handOverSaved) return;
       handOverSaved = true;
       lastHandReviews = List.unmodifiable(_handReviews);
       reads.observe(done);
-      unawaited(history.add(HandHistory.fromState(
-        done,
-        heroSeat: GameController.heroSeat,
-        reviews: lastHandReviews,
-        mode: c.settings.tournament ? 'sng' : 'cash',
-      )));
+      // Watching after busting out: show the hand, but it isn't ours to keep.
+      if (heroDealt) {
+        unawaited(history.add(HandHistory.fromState(
+          done,
+          heroSeat: GameController.heroSeat,
+          reviews: lastHandReviews,
+          mode: c.settings.tournament ? 'sng' : 'cash',
+        )));
+      }
       _checkAchievementsSoon();
       handOver = true;
       _notify();
@@ -82,6 +86,7 @@ extension _HomeGame on GameController {
           // Our cards go where the deal order puts them; other cards are
           // placeholders until revealed.
           final hole = (m['hole'] as List).cast<int>();
+          heroDealt = hole.length == 2;
           final dealtIn = [for (var i = 0; i < n; i++) if (players[i] != null) i];
           final first = sb >= 0 ? sb : dealtIn.firstWhere((i) => i > button, orElse: () => dealtIn.first);
           final order = [

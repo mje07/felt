@@ -4,6 +4,7 @@ import 'package:felt/app/settings.dart';
 import 'package:felt/net/client.dart';
 import 'package:felt/net/host.dart';
 import 'package:felt/net/protocol.dart';
+import 'package:felt/screens/friends_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_engine/poker_engine.dart';
 
@@ -30,8 +31,10 @@ Settings quick() => Settings.memory()
   ..reduceMotion = true;
 
 void main() {
-  testWidgets('a home game keeps every player in sync and never leaks hole cards', (tester) async {
-    final host = HomeGameHost(const HomeGameSettings(name: 'Friday', seats: 4, fillWithBots: true), hostName: 'Hosty');
+  for (final sng in [false, true]) {
+  testWidgets('a home ${sng ? 'Sit & Go' : 'cash game'} keeps every player in sync and never leaks hole cards', (tester) async {
+    final host = HomeGameHost(
+        HomeGameSettings(name: 'Friday', seats: 4, tournament: sng, speed: BlindSpeed.hyper), hostName: 'Hosty');
     final ann = Friend('Ann', host), bob = Friend('Bob', host);
     await ann.client.join();
     await bob.client.join();
@@ -40,7 +43,7 @@ void main() {
     host.markStarted();
 
     final hostHistory = HistoryStore.memory();
-    const config = TableConfig(homeGame: true, seats: 4, smallBlind: 5, bigBlind: 10, difficulty: Difficulty.casual);
+    final config = homeGameConfig(host.settings);
     final hostCtl = GameController(config: config, settings: quick(), history: hostHistory, host: host, useIsolates: false);
     for (final f in [ann, bob]) {
       f.controller =
@@ -51,16 +54,24 @@ void main() {
     bob.controller.start();
 
     var i = 0;
-    while (hostHistory.hands.length < 12 && i++ < 60000) {
+    while (hostHistory.hands.length < (sng ? 30 : 12) && hostCtl.outcome == null && i++ < 60000) {
       await tester.pump(const Duration(milliseconds: 50));
       for (final c in [hostCtl, ann.controller, bob.controller]) {
         final l = c.heroLegal;
-        if (l != null) c.act(l.canCheck ? const PlayerAction.check() : const PlayerAction.call());
+        if (l == null) continue;
+        // Friends call everything; the host only checks, so it outlasts them.
+        c.act(l.canCheck ? const PlayerAction.check() : (identical(c, hostCtl) && sng ? const PlayerAction(ActionType.fold) : const PlayerAction.call()));
       }
       if (hostCtl.heroBusted) hostCtl.rebuy(); // free in home games
       if (hostCtl.handOver) hostCtl.dealNext();
     }
-    expect(hostHistory.hands.length, greaterThanOrEqualTo(12));
+    expect(hostHistory.hands.length, greaterThanOrEqualTo(sng ? 3 : 12));
+    if (sng) {
+      // Both friends are told where everyone finished.
+      for (final f in [ann, bob]) {
+        expect(f.received.where((m) => m['t'] == 'out'), isNotEmpty, reason: f.name);
+      }
+    }
     await tester.pump(const Duration(seconds: 2));
 
     // Every hand a friend finished ends with the host's exact stacks.
@@ -103,6 +114,7 @@ void main() {
     await host.close();
     await tester.pump(const Duration(seconds: 5));
   }, timeout: const Timeout(Duration(minutes: 5)));
+  }
 
   test('hosting over a real WebSocket: join, lobby, version check', () async {
     final host = HomeGameHost(const HomeGameSettings(name: 'Socket game', seats: 3), hostName: 'Hosty');
