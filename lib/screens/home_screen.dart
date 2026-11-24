@@ -16,6 +16,7 @@ import 'panel_route.dart';
 import 'settings_panel.dart';
 import 'range_screen.dart';
 import 'stats_screen.dart';
+import 'study_screen.dart';
 import 'training_screen.dart';
 import 'table_screen.dart';
 
@@ -294,6 +295,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             minWidth: 0,
                             onPressed: () => Navigator.of(context)
                                 .push(CupertinoPageRoute<void>(builder: (_) => const EquityLabScreen())),
+                          ),
+                          PillButton(
+                            label: 'Study',
+                            style: PillStyle.plain,
+                            minWidth: 0,
+                            onPressed: () => Navigator.of(context)
+                                .push(CupertinoPageRoute<void>(builder: (_) => const StudyScreen())),
                           ),
                         ]),
                       ],

@@ -59,45 +59,53 @@ class _RangeGridState extends State<RangeGrid> {
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
-    return LayoutBuilder(builder: (context, c) {
-      final side = math.min(c.maxWidth, widget.maxSize);
-      void hover(int? i) {
-        if (i == _hover) return;
-        setState(() => _hover = i);
-        widget.onHover?.call(i);
-      }
+    return LayoutBuilder(
+      builder: (context, c) {
+        final side = math.min(c.maxWidth, widget.maxSize);
+        void hover(int? i) {
+          if (i == _hover) return;
+          setState(() => _hover = i);
+          widget.onHover?.call(i);
+        }
 
-      return MouseRegion(
-        cursor: widget.onPaint != null ? SystemMouseCursors.click : MouseCursor.defer,
-        onHover: (e) => hover(_cellAt(e.localPosition, side)),
-        onExit: (_) => hover(null),
-        child: Listener(
-          onPointerDown: widget.onPaint == null
-              ? null
-              : (e) {
-                  final i = _cellAt(e.localPosition, side);
-                  if (i == null) return;
-                  _lastPainted = i;
-                  widget.onPaint!(i, true);
-                },
-          onPointerMove: widget.onPaint == null
-              ? null
-              : (e) {
-                  final i = _cellAt(e.localPosition, side);
-                  hover(i);
-                  if (i == null || i == _lastPainted) return;
-                  _lastPainted = i;
-                  widget.onPaint!(i, false);
-                },
-          child: RepaintBoundary(
-            child: CustomPaint(
-              size: Size.square(side),
-              painter: _GridPainter(widget.cells, widget.highlight, _hover, p),
+        return Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox.square(
+            dimension: side,
+            child: MouseRegion(
+              cursor: widget.onPaint != null ? SystemMouseCursors.click : MouseCursor.defer,
+              onHover: (e) => hover(_cellAt(e.localPosition, side)),
+              onExit: (_) => hover(null),
+              child: Listener(
+                onPointerDown: widget.onPaint == null
+                    ? null
+                    : (e) {
+                        final i = _cellAt(e.localPosition, side);
+                        if (i == null) return;
+                        _lastPainted = i;
+                        widget.onPaint!(i, true);
+                      },
+                onPointerMove: widget.onPaint == null
+                    ? null
+                    : (e) {
+                        final i = _cellAt(e.localPosition, side);
+                        hover(i);
+                        if (i == null || i == _lastPainted) return;
+                        _lastPainted = i;
+                        widget.onPaint!(i, false);
+                      },
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size.square(side),
+                    painter: _GridPainter(widget.cells, widget.highlight, _hover, p),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   }
 }
 
@@ -184,62 +192,74 @@ class CardPicker extends StatelessWidget {
     final p = Palette.of(context);
     final fourColor = SettingsScope.of(context).fourColorDeck;
     Color suitColorOf(int s) => suitColor(p, s, fourColor);
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      for (final suit in const [3, 2, 1, 0])
-        Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            for (var rank = 12; rank >= 0; rank--)
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: () {
-                  final card = makeCard(rank, suit);
-                  final on = selected.contains(card);
-                  final off = blocked.contains(card) && !on;
-                  return Semantics(
-                    button: true,
-                    selected: on,
-                    label: cardToString(card),
-                    child: GestureDetector(
-                      key: ValueKey('pick-${cardToString(card)}'),
-                      onTap: off ? null : () => onToggle(card),
-                      child: MouseRegion(
-                        cursor: off ? SystemMouseCursors.basic : SystemMouseCursors.click,
-                        child: AnimatedContainer(
-                          duration: Motion.fast,
-                          width: tile,
-                          height: tile * 1.3,
-                          decoration: BoxDecoration(
-                            color: on ? p.accent : p.cardFace,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: on ? p.accent : p.separator),
-                          ),
-                          child: Opacity(
-                            opacity: off ? 0.25 : 1,
-                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                              Text(rankChars[rank],
-                                  style: TextStyle(
-                                      fontFamily: Typo.family,
-                                      fontSize: tile * 0.42,
-                                      height: 1,
-                                      fontWeight: FontWeight.w700,
-                                      color: on ? const Color(0xFFFFFFFF) : suitColorOf(suit))),
-                              const SizedBox(height: 2),
-                              CustomPaint(
-                                size: Size.square(tile * 0.32),
-                                painter: SuitPainter(suit, on ? const Color(0xFFFFFFFF) : suitColorOf(suit)),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final suit in const [3, 2, 1, 0])
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var rank = 12; rank >= 0; rank--)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: () {
+                      final card = makeCard(rank, suit);
+                      final on = selected.contains(card);
+                      final off = blocked.contains(card) && !on;
+                      return Semantics(
+                        button: true,
+                        selected: on,
+                        label: cardToString(card),
+                        child: GestureDetector(
+                          key: ValueKey('pick-${cardToString(card)}'),
+                          onTap: off ? null : () => onToggle(card),
+                          child: MouseRegion(
+                            cursor: off ? SystemMouseCursors.basic : SystemMouseCursors.click,
+                            child: AnimatedContainer(
+                              duration: Motion.fast,
+                              width: tile,
+                              height: tile * 1.3,
+                              decoration: BoxDecoration(
+                                color: on ? p.accent : p.cardFace,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: on ? p.accent : p.separator),
                               ),
-                            ]),
+                              child: Opacity(
+                                opacity: off ? 0.25 : 1,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      rankChars[rank],
+                                      style: TextStyle(
+                                        fontFamily: Typo.family,
+                                        fontSize: tile * 0.42,
+                                        height: 1,
+                                        fontWeight: FontWeight.w700,
+                                        color: on ? const Color(0xFFFFFFFF) : suitColorOf(suit),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    CustomPaint(
+                                      size: Size.square(tile * 0.32),
+                                      painter: SuitPainter(suit, on ? const Color(0xFFFFFFFF) : suitColorOf(suit)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                  );
-                }(),
-              ),
-          ]),
-        ),
-    ]);
+                      );
+                    }(),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 }
 

@@ -17,6 +17,7 @@ import 'package:felt/screens/panel_route.dart';
 import 'package:felt/screens/range_screen.dart';
 import 'package:felt/screens/equity_lab_screen.dart';
 import 'package:felt/screens/settings_panel.dart';
+import 'package:felt/screens/study_screen.dart';
 import 'package:felt/screens/stats_screen.dart';
 import 'package:felt/screens/training_screen.dart';
 import 'package:felt/widgets/review_panel.dart';
@@ -72,6 +73,7 @@ void main() {
   statsShots();
   coachShots();
   suiteShots();
+  studyShots();
   settingsShots();
   historyShots();
   sngShots();
@@ -482,6 +484,33 @@ void suiteShots() {
       await tester.tap(find.text('Top pair, good kicker'));
       await tester.pumpAndSettle();
       await _snap(tester, 'equity_lab_$mode');
+    });
+  }
+}
+
+void studyShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+
+    testWidgets('study $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1150);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(_themed(dark, const StudyScreen()));
+      for (final c in ['2h', '7s']) {
+        await tester.tap(find.byKey(ValueKey('pick-$c')).first);
+        await tester.pump();
+      }
+      await tester.tap(find.text('Solve'));
+      for (var i = 0; i < 20 && find.text('Check').evaluate().isEmpty; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+        await tester.pump();
+      }
+      await tester.tap(find.textContaining('Check').first);
+      for (var i = 0; i < 6; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+        await tester.pump();
+      }
+      await _snap(tester, 'study_$mode');
     });
   }
 }
