@@ -62,6 +62,7 @@ Postflop it runs a Monte Carlo equity estimate against each opponent's range, th
 **Sit & Go play:** at 15 big blinds or fewer, bots open-shove and call all-ins from the same push/fold charts the coach uses, shifted by personality. Expert bots check calls near the bubble with ICM.
 
 **Measuring strength:** `tool/arena.dart` plays duplicate-format matches, where each deal is replayed with every seat rotation and every hand starts at the same stack. It reports bb/100 with a 95% confidence interval. `test/bot_strength_test.dart` (slow) guards the ordering.
+
 ## Develop
 
 ```sh
