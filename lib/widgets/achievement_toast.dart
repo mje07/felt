@@ -18,6 +18,7 @@ class _AchievementToastState extends State<AchievementToast> {
   Achievement? _showing;
   bool _visible = false;
   Timer? _timer;
+  bool _taking = false;
 
   @override
   void initState() {
@@ -34,8 +35,15 @@ class _AchievementToastState extends State<AchievementToast> {
   }
 
   void _check() {
-    if (!mounted || _showing != null) return;
-    final next = Achievements.current.takeFresh();
+    if (!mounted || _showing != null || _taking) return;
+    // takeFresh notifies listeners (us) synchronously.
+    _taking = true;
+    final Achievement? next;
+    try {
+      next = Achievements.current.takeFresh();
+    } finally {
+      _taking = false;
+    }
     if (next == null) return;
     setState(() {
       _showing = next;

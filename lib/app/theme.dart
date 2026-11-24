@@ -146,3 +146,11 @@ String formatChips(int n) {
   }
   return n < 0 ? '−$b' : b.toString();
 }
+
+/// Short chip amounts for tight spaces: 2,500 → 2.5K, 1,000,000 → 1M.
+String formatChipsShort(int n) {
+  String trim(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+  final a = n.abs();
+  final s = a >= 1000000 ? '${trim(a / 1000000)}M' : (a >= 1000 ? '${trim(a / 1000)}K' : '$a');
+  return n < 0 ? '−$s' : s;
+}

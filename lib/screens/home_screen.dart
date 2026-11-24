@@ -5,18 +5,21 @@ import '../app/bankroll.dart';
 import '../app/controller.dart';
 import '../app/events.dart';
 import '../app/history_store.dart';
+import '../app/learn_progress.dart';
 import '../app/settings.dart';
 import '../app/theme.dart';
 import '../app/updater.dart';
 import '../widgets/common.dart';
 import '../widgets/controls.dart';
 import '../widgets/playing_card.dart';
+import 'career_screen.dart';
 import 'equity_lab_screen.dart';
 import 'history_panel.dart';
 import 'friends_screen.dart';
 import 'learn_screen.dart';
 import 'panel_route.dart';
 import 'settings_panel.dart';
+import 'spot_trainer_screen.dart';
 import 'range_screen.dart';
 import 'stats_screen.dart';
 import 'study_screen.dart';
@@ -242,9 +245,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               SettingRow(
                                 label: 'Buy-in',
                                 detail: 'Prize pool ${formatChips(_sngBuyIns[_sngBuyIn] * _seats)}',
-                                trailing: ChoiceChips<int>(
+                                below: ChoiceChips<int>(
                                   value: _sngBuyIn,
-                                  options: {for (var i = 0; i < _sngBuyIns.length; i++) i: formatChips(_sngBuyIns[i])},
+                                  options: {for (var i = 0; i < _sngBuyIns.length; i++) i: formatChipsShort(_sngBuyIns[i])},
                                   onChanged: (v) => setState(() => _sngBuyIn = v),
                                 ),
                               ),
@@ -324,59 +327,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: Typo.callout(p.destructive),
                           ),
                         ],
-                        const SizedBox(height: Space.m),
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          children: [
-                          PillButton(
-                            label: 'Friends',
-                            style: PillStyle.plain,
-                            minWidth: 0,
-                            onPressed: () => Navigator.of(context)
-                                .push(CupertinoPageRoute<void>(builder: (_) => FriendsScreen(history: widget.history)))
-                                .then((_) => setState(() {})),
-                          ),
-                          PillButton(
-                            label: 'Learn',
-                            style: PillStyle.plain,
-                            minWidth: 0,
-                            onPressed: () => Navigator.of(context)
-                                .push(CupertinoPageRoute<void>(builder: (_) => LearnScreen(history: widget.history)))
-                                .then((_) => setState(() {})),
-                          ),
-                            PillButton(
-                              label: 'Training',
-                              style: PillStyle.plain,
-                              minWidth: 0,
-                              onPressed: () => Navigator.of(
-                                context,
-                              ).push(CupertinoPageRoute<void>(builder: (_) => TrainingScreen(history: widget.history))),
-                            ),
-                            PillButton(
-                              label: 'Range Charts',
-                              style: PillStyle.plain,
-                              minWidth: 0,
-                              onPressed: () => Navigator.of(context)
-                                  .push(CupertinoPageRoute<void>(builder: (_) => RangeScreen(history: widget.history))),
-                            ),
-                            PillButton(
-                              label: 'Equity Lab',
-                              style: PillStyle.plain,
-                              minWidth: 0,
-                              onPressed: () =>
-                                  Navigator.of(context)
-                                      .push(CupertinoPageRoute<void>(builder: (_) => const EquityLabScreen())),
-                            ),
-                            PillButton(
-                              label: 'Study',
-                              style: PillStyle.plain,
-                              minWidth: 0,
-                              onPressed: () =>
-                                  Navigator.of(context)
-                                      .push(CupertinoPageRoute<void>(builder: (_) => const StudyScreen())),
-                            ),
-                          ],
-                        ),
+                        const SizedBox(height: Space.xxl),
+                        _Shelves(history: widget.history, onReturn: () => setState(() {})),
                       ],
                     ),
                   ),
@@ -569,6 +521,109 @@ class _EventTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Everything beyond a quick game, in three groups: friends, the learning
+/// path, and the study tools.
+class _Shelves extends StatelessWidget {
+  const _Shelves({required this.history, required this.onReturn});
+  final HistoryStore history;
+  final VoidCallback onReturn;
+
+  @override
+  Widget build(BuildContext context) {
+    void open(Widget screen) =>
+        Navigator.of(context).push(CupertinoPageRoute<void>(builder: (_) => screen)).then((_) => onReturn());
+    final plan = todaysPlan(history);
+    final done = plan.where((i) => LearnProgress.current.doneToday(i)).length;
+    final shelves = [
+      _Shelf(
+        icon: CupertinoIcons.person_3_fill,
+        title: 'Friends',
+        blurb: 'Host a table or join one: on your network, by address or with an invite code.',
+        links: [('Play with friends', () => open(FriendsScreen(history: history)))],
+      ),
+      _Shelf(
+        icon: CupertinoIcons.book_fill,
+        title: 'Learn',
+        blurb: plan.isEmpty
+            ? 'Lessons, skill ratings and a career to climb.'
+            : 'Today: $done of ${plan.length} done${LearnProgress.current.streak > 1 ? ' · ${LearnProgress.current.streak}-day streak' : ''}.',
+        links: [
+          ('Today\'s plan', () => open(LearnScreen(history: history))),
+          ('Lessons', () => open(LearnScreen(history: history))),
+          ('Career', () => open(CareerScreen(history: history))),
+        ],
+      ),
+      _Shelf(
+        icon: CupertinoIcons.lab_flask_solid,
+        title: 'Study',
+        blurb: 'Solve spots, drill decisions and check the maths.',
+        links: [
+          ('Solver', () => open(const StudyScreen())),
+          ('Spot trainer', () => open(const SpotTrainerScreen())),
+          ('Drills', () => open(TrainingScreen(history: history))),
+          ('Equity lab', () => open(const EquityLabScreen())),
+          ('Range charts', () => open(RangeScreen(history: history))),
+        ],
+      ),
+    ];
+    return LayoutBuilder(builder: (context, c) {
+      if (c.maxWidth < 560) {
+        return Column(children: [
+          for (final s in shelves) Padding(padding: const EdgeInsets.only(bottom: Space.m), child: s),
+        ]);
+      }
+      return IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (final (i, s) in shelves.indexed) ...[
+            if (i > 0) const SizedBox(width: Space.m),
+            Expanded(child: s),
+          ],
+        ]),
+      );
+    });
+  }
+}
+
+class _Shelf extends StatelessWidget {
+  const _Shelf({required this.icon, required this.title, required this.blurb, required this.links});
+  final IconData icon;
+  final String title, blurb;
+  final List<(String, VoidCallback)> links;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(Space.l, Space.l, Space.l, Space.s),
+      decoration: BoxDecoration(
+        color: p.isDark ? const Color(0xFF1C1C1E) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(Radii.l),
+        border: Border.all(color: p.isDark ? const Color(0x14FFFFFF) : const Color(0x0F000000)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 16, color: p.accent),
+          const SizedBox(width: Space.s),
+          Text(title, style: Typo.headline(p.label)),
+        ]),
+        const SizedBox(height: Space.xs),
+        Text(blurb, style: Typo.callout(p.secondaryLabel)),
+        const SizedBox(height: Space.s),
+        for (final (label, onTap) in links)
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            minimumSize: Size.zero,
+            onPressed: onTap,
+            child: Row(children: [
+              Expanded(child: Text(label, style: Typo.body(p.accent))),
+              Icon(CupertinoIcons.chevron_right, size: 14, color: p.tertiaryLabel),
+            ]),
+          ),
+      ]),
     );
   }
 }

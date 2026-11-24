@@ -99,7 +99,7 @@ void main() {
     final mode = dark ? 'dark' : 'light';
 
     testWidgets('lobby $mode', (tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.physicalSize = const Size(1280, 1180);
       tester.view.devicePixelRatio = 1;
       final settings = Settings.memory()..appearance = dark ? Appearance.dark : Appearance.light;
       await tester.pumpWidget(RepaintBoundary(
@@ -719,6 +719,16 @@ void learnShots() {
       await tester.pumpAndSettle();
       await _snap(tester, 'career_$mode');
     });
-testWidgets('friends $mode', (tester) async {      tester.view.physicalSize = const Size(1280, 1100);      tester.view.devicePixelRatio = 1;      await tester.pumpWidget(_themed(dark, FriendsScreen(history: HistoryStore.memory())));      await tester.pumpAndSettle();      await _snap(tester, 'friends_$mode');      await tester.tap(find.text('Join a game'));      await tester.pumpAndSettle();      await _snap(tester, 'friends_join_$mode');    });
+
+    testWidgets('friends $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1300);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(_themed(dark, FriendsScreen(history: HistoryStore.memory())));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'friends_$mode');
+      await tester.tap(find.text('Join a game'));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'friends_join_$mode');
+    });
   }
 }
