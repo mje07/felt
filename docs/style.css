@@ -203,6 +203,10 @@ h3 { font: 600 22px/1.25 InterDisplay, Inter, sans-serif; letter-spacing: -0.3px
 .shot.crop-drill { aspect-ratio: 1280 / 640; }
 .shot.crop-drill img { object-position: center 70%; }
 .shot.crop-sng { aspect-ratio: 1280 / 640; }
+.shot.crop-study { aspect-ratio: 1280 / 1000; }
+.shot.crop-trainer { aspect-ratio: 1280 / 660; }
+.shot.crop-replay { aspect-ratio: 1280 / 960; }
+.shot.crop-trainer img, .shot.crop-replay img { object-position: center top; }
 
 /* Hand review (review_panel.dart), rebuilt in HTML */
 .review { padding: 0; overflow: hidden; box-shadow: var(--shadow); }

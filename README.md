@@ -2,7 +2,7 @@
 
 A clean, Apple-inspired No-Limit Texas Hold'em table for **Windows and Linux**.
 Website: https://mje07.github.io/felt/
-Play a cash game against AI opponents with distinct styles. Built with Flutter, so it ships native desktop binaries with no Electron or webview.
+Play cash games and Sit & Gos against adaptive AI opponents, study spots with a built-in game-theory solver, and analyse your real online hands. Built with Flutter, so it ships native desktop binaries with no Electron or webview.
 
 ## Layout
 
@@ -63,6 +63,31 @@ Postflop it runs a Monte Carlo equity estimate against each opponent's range, th
 
 **Measuring strength:** `tool/arena.dart` plays duplicate-format matches, where each deal is replayed with every seat rotation and every hand starts at the same stack. It reports bb/100 with a 95% confidence interval. `test/bot_strength_test.dart` (slow) guards the ordering.
 
+## Study tools
+
+**Solver** (`solver/solver.dart`) is a heads-up postflop game-theory solver that runs on your own computer.
+- **How it works:** vectorised Discounted CFR over whole ranges, with card-removal-correct fold and showdown terminals. It computes best response and exploitability, and per-hand EV.
+- **Sizes:** flop ⅓ and ¾ pot, turn ⅔, river ½ and pot, plus one raise and all-in when shallow.
+- **Speed (compiled):** about 20 ms for the river, 14 s for the turn, and 1.5 min for the flop to reach under 1% of the pot exploitable.
+- **Flop solves** model a spread of 8 turn and 6 river cards.
+- **Verification:** `test/solver_test.dart` checks it against the analytic nuts-or-air river game: bluff 9.4%, call 50%.
+- **Benchmark:** `tool/solver_bench.dart`.
+
+What uses the solver:
+- **Study** solves preset preflop lines on any board. You can browse the tree with every hand split by the solver's action mix, and see each hand's EV. Solves are cached on disk.
+- **The coach** solves heads-up river decisions exactly and grades them by the EV given up. If the solver plays your action at least 10% of the time, it counts as sound.
+- **Spot Trainer** plays whole hands against an opponent who follows the solver. Every decision is graded, and the next spot is solved in the background while you play.
+
+**Equity Lab** (`equity_lab.dart`) shows range-against-range equity for 2–4 ranges.
+- Heads-up equity on the flop, turn and river is exact, enumerated with card removal and checked against brute force. Preflop and multiway equity is sampled.
+- It has a Flopzilla-style breakdown of made hands and draws, a weight brush, presets and a range notation box.
+
+**Your real hands**
+- **Import:** PokerStars and GGPoker hand histories, cash and tournaments, via `import/hand_import.dart`. Each hand is replayed through the rules engine. Results, including rake and mucked hands, come from the history's own text. Unsupported hands (straddles, run-it-twice) are skipped with a reason. Every decision is graded as hands import.
+- **Export:** any hands in PokerStars format, via `import/hand_export.dart`.
+- **Replayer:** step through a hand with the arrow keys, with coach comments and your equity by street.
+- **Leak finder:** ranks recurring mistakes by bb/100 and links each one to the matching trainer.
+
 ## Develop
 
 ```sh
@@ -76,6 +101,7 @@ dart test --run-skipped -t slow             # exhaustive 133,784,560-hand evalua
 dart run tool/simulate.dart --hands 100000  # bot-vs-bot soak test (chip conservation)
 dart run tool/arena.dart --deals 20000 --difficulty expert  # bot strength, duplicate format
 dart test --run-skipped -t slow test/bot_strength_test.dart
+dart compile exe tool/solver_bench.dart -o build/solver_bench.exe  # solver timings
 
 # app
 flutter test
