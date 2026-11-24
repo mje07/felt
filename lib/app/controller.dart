@@ -520,7 +520,8 @@ class GameController extends ChangeNotifier {
         (p.name, p.stack, p.personality?.id ?? 'tag', p.difficulty),
     ];
     final places = Map.of(t.places);
-    final button = t.button, hands = t.handNumber, buyIn = t.buyIn;
+    final rot = (t.rotation.buttonPos, t.rotation.smallBlindPos, t.rotation.bigBlindPos);
+    final hands = t.handNumber, buyIn = t.buyIn;
     final speed = t.speed, style = t.payoutStyle;
     return Isolate.run(() {
       final copy = Tournament(
@@ -533,7 +534,9 @@ class GameController extends ChangeNotifier {
         payoutStyle: style,
         rng: Random(),
       )
-        ..button = button
+        ..rotation.buttonPos = rot.$1
+        ..rotation.smallBlindPos = rot.$2
+        ..rotation.bigBlindPos = rot.$3
         ..handNumber = hands;
       copy.places.addAll(places);
       copy.simulateRest();

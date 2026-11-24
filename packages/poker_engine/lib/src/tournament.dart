@@ -93,6 +93,54 @@ List<int> prizesFor(PayoutStyle style, int players, int buyIn) {
   return prizes;
 }
 
+/// Button and blinds under the TDA dead-button rule: the big blind always
+/// moves forward to the next live player, the small blind goes to whoever
+/// was big blind (or is dead if they busted), and the button to the seat
+/// that was the small blind (dead if that player busted). Nobody skips the
+/// big blind or pays it twice when players bust.
+class BlindRotation {
+  /// Seat positions (they can be empty seats when dead).
+  int buttonPos = -1, smallBlindPos = -1, bigBlindPos = -1;
+
+  /// Seat that posts the small blind this hand, or -1 for a dead small blind.
+  int smallBlindSeat = -1;
+
+  /// Moves to the next hand. [alive] says which seats have a live player.
+  void advance(List<bool> alive, Random rng) {
+    final n = alive.length;
+    final live = [for (var i = 0; i < n; i++) if (alive[i]) i];
+    if (live.length < 2) throw StateError('Need two live players');
+    int nextAlive(int from) {
+      for (var k = 1; k <= n; k++) {
+        final s = (from + k) % n;
+        if (alive[s]) return s;
+      }
+      return -1;
+    }
+
+    if (bigBlindPos < 0 || !live.contains(nextAlive(bigBlindPos))) {
+      // First hand: a random button, blinds to its left.
+      buttonPos = live[rng.nextInt(live.length)];
+      smallBlindPos = live.length == 2 ? buttonPos : nextAlive(buttonPos);
+      bigBlindPos = nextAlive(smallBlindPos);
+      smallBlindSeat = smallBlindPos;
+      return;
+    }
+    final newBb = nextAlive(bigBlindPos);
+    if (live.length == 2) {
+      // Heads-up: the button posts the small blind; the big blind alternates.
+      bigBlindPos = newBb;
+      buttonPos = smallBlindPos = live.firstWhere((s) => s != newBb);
+      smallBlindSeat = smallBlindPos;
+      return;
+    }
+    buttonPos = smallBlindPos;
+    smallBlindPos = bigBlindPos;
+    bigBlindPos = newBb;
+    smallBlindSeat = alive[smallBlindPos] ? smallBlindPos : -1;
+  }
+}
+
 class Elimination {
   const Elimination(this.seat, this.place);
   final int seat, place;
@@ -119,7 +167,20 @@ class Tournament {
   /// Prize for 1st, 2nd, ... (only paid places).
   final List<int> prizes;
 
-  int button = -1;
+  final rotation = BlindRotation();
+
+  /// Button seat for the current hand (may be an empty seat: dead button).
+  int get button => rotation.buttonPos;
+
+  /// Places the rotation as if [seat] had the button last hand, so the next
+  /// hand's button is the seat after it (tests, and resuming a copy).
+  set button(int seat) {
+    final n = seats.length;
+    rotation
+      ..buttonPos = seat
+      ..smallBlindPos = (seat + 1) % n
+      ..bigBlindPos = (seat + 2) % n;
+  }
 
   /// Hands started so far.
   int handNumber = 0;
@@ -152,23 +213,14 @@ class Tournament {
   HandState startNextHand({List<int>? deck}) {
     if (isFinished) throw StateError('Tournament is over');
     final n = seats.length;
-    final live = alive;
-    if (button < 0) {
-      button = live[rng.nextInt(live.length)];
-    } else {
-      for (var i = 1; i <= n; i++) {
-        final s = (button + i) % n;
-        if (_alive(s)) {
-          button = s;
-          break;
-        }
-      }
-    }
+    rotation.advance([for (var i = 0; i < n; i++) _alive(i)], rng);
     final level = currentLevel;
     handNumber++;
     return startHand(
       players: [for (var i = 0; i < n; i++) _alive(i) ? SeatSetup(seats[i].name, seats[i].stack) : null],
       button: button,
+      smallBlindSeat: rotation.smallBlindSeat,
+      bigBlindSeat: rotation.bigBlindPos,
       smallBlind: level.smallBlind,
       bigBlind: level.bigBlind,
       ante: level.ante,

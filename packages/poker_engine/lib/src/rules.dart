@@ -30,7 +30,10 @@ int _next(List<Seat> seats, int from, bool Function(Seat) test) {
 }
 
 /// Starts a hand. [players] is indexed by seat; null = empty seat.
-/// Seats with no chips are dealt out. [button] must be a seat that is dealt in.
+/// Seats with no chips are dealt out. [button] must be a seat that is dealt
+/// in, unless the blinds are given explicitly ([bigBlindSeat], and
+/// [smallBlindSeat] = -1 for a dead small blind): tournaments use the dead
+/// button rule, where the button can sit on an empty seat.
 /// Pass [deck] to stack the deck (tests); otherwise it is shuffled with [rng].
 HandState startHand({
   required List<SeatSetup?> players,
@@ -42,6 +45,8 @@ HandState startHand({
   /// Every player posts [ante] (older tournament format) instead of the big
   /// blind posting it for the table.
   bool anteFromEveryone = false,
+  int? smallBlindSeat,
+  int? bigBlindSeat,
   required int handNumber,
   Random? rng,
   List<int>? deck,
@@ -57,14 +62,19 @@ HandState startHand({
   ];
   final active = seats.where((s) => s.inHand).length;
   if (active < 2) throw ArgumentError('Need at least two players with chips');
-  if (!seats[button].inHand) throw ArgumentError('Button seat $button is empty');
+  final explicit = bigBlindSeat != null;
+  if (!explicit && !seats[button].inHand) throw ArgumentError('Button seat $button is empty');
+  if (explicit && !seats[bigBlindSeat].inHand) throw ArgumentError('Big blind seat $bigBlindSeat is empty');
+  if (explicit && (smallBlindSeat ?? -1) >= 0 && !seats[smallBlindSeat!].inHand) {
+    throw ArgumentError('Small blind seat $smallBlindSeat is empty');
+  }
 
   final cards = deck ?? List<int>.generate(52, (i) => i);
   if (deck == null) shuffle(cards, rng ?? secureRandom());
 
   // Heads-up: the button posts the small blind.
-  final sbSeat = active == 2 ? button : _next(seats, button, (s) => s.inHand);
-  final bbSeat = _next(seats, sbSeat, (s) => s.inHand);
+  final sbSeat = explicit ? (smallBlindSeat ?? -1) : (active == 2 ? button : _next(seats, button, (s) => s.inHand));
+  final bbSeat = explicit ? bigBlindSeat : _next(seats, sbSeat, (s) => s.inHand);
 
   final state = HandState(
     handNumber: handNumber,
@@ -102,7 +112,7 @@ HandState startHand({
       log.add(AntePosted(s.index, a));
     }
   }
-  post(sbSeat, smallBlind, false);
+  if (sbSeat >= 0) post(sbSeat, smallBlind, false);
   post(bbSeat, bigBlind, true);
   // Big-blind ante: dead money (counts towards the pot, not the street bet).
   if (ante > 0 && !anteFromEveryone) {
@@ -118,13 +128,14 @@ HandState startHand({
   // Players must call the full big blind even if the BB is short.
   state.currentBet = bigBlind;
 
-  // Deal two rounds, one card at a time, starting with the small blind.
+  // Deal two rounds, one card at a time, starting left of the button.
   final order = <int>[];
-  var seat = sbSeat;
+  final firstDealt = sbSeat >= 0 ? sbSeat : _next(seats, button, (s) => s.inHand);
+  var seat = firstDealt;
   do {
     order.add(seat);
     seat = _next(seats, seat, (s) => s.inHand);
-  } while (seat != sbSeat);
+  } while (seat != firstDealt);
   for (var round = 0; round < 2; round++) {
     for (final i in order) {
       seats[i].hole.add(state.drawCard());

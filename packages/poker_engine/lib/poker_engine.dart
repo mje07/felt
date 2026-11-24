@@ -18,6 +18,7 @@ export 'src/import/hand_import.dart';
 export 'src/import/hand_export.dart';
 export 'src/icm.dart';
 export 'src/tournament.dart';
+export 'src/mtt.dart';
 export 'src/arena.dart';
 export 'src/stats.dart';
 export 'src/leaks.dart';
