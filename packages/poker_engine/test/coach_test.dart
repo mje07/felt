@@ -125,12 +125,28 @@ void main() {
       expect(r.requiredEquity, closeTo(1 / 3, 0.01));
     });
 
-    test('checking the nuts on the river misses value', () {
-      final s = toRiver('Kc Kd', 'Ah Kh', 'Qh Jh Th 2c 3d');
+    test('checking the nuts on the turn misses value (equity model)', () {
+      var s = deal(const [1000, 1000], button: 1, deck: stackedDeck(['Kc Kd', 'Ah Kh'], 'Qh Jh Th 2c 3d'));
+      s = act(s, call);
+      s = act(s, check);
+      while (s.street != Street.turn) {
+        s = act(s, check);
+      }
       final r = grade(s, check);
+      expect(r.bySolver, isFalse);
       expect(r.grade.index, greaterThanOrEqualTo(Grade.inaccuracy.index));
       expect(r.kind, MistakeKind.missedValue);
       expect(grade(s, PlayerAction(ActionType.bet, 15)).grade.index, lessThanOrEqualTo(Grade.good.index));
+    });
+
+    test('on the river the solver decides: checking the nuts out of position can be right', () {
+      // Out of position with a royal flush, the solver mostly checks to let
+      // the opponent bet or bluff: checking and betting are worth about the same.
+      final s = toRiver('Kc Kd', 'Ah Kh', 'Qh Jh Th 2c 3d');
+      final r = grade(s, check);
+      expect(r.bySolver, isTrue);
+      expect(r.grade.index, lessThanOrEqualTo(Grade.good.index));
+      expect(grade(s, PlayerAction(ActionType.bet, 20)).grade.index, lessThanOrEqualTo(Grade.good.index));
     });
   });
 

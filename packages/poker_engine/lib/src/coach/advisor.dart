@@ -9,6 +9,7 @@ import '../range_model.dart';
 import 'outs.dart';
 import 'pushfold.dart';
 import 'ranges.dart';
+import 'solver_advice.dart';
 
 /// One candidate action with its estimated value.
 class OptionEv {
@@ -40,6 +41,7 @@ class DecisionAnalysis {
     this.pushFold = false,
     this.shoveCall,
     this.effectiveStackBb = 100,
+    this.solver,
   });
 
   final Street street;
@@ -87,6 +89,10 @@ class DecisionAnalysis {
   /// Facing an all-in: solved call-or-fold (ICM in tournaments).
   final ShoveCall? shoveCall;
   final double effectiveStackBb;
+
+  /// Heads-up river decisions: the solver's actions, EVs and mix for this
+  /// hand. When set, grading uses it instead of the equity model.
+  final SolverAdvice? solver;
 
   bool get isPreflop => street == Street.preflop;
 
@@ -277,6 +283,7 @@ DecisionAnalysis analyzeDecision(BotContext ctx, {int samples = 2500, Random? rn
         ? ShoveCall.compute(ctx, e, ctx.opponentRanges.isEmpty ? 1.0 : ctx.opponentRanges.reduce(min))
         : null,
     effectiveStackBb: ctx.effectiveStackBb,
+    solver: solveRiverDecision(ctx),
   );
 }
 

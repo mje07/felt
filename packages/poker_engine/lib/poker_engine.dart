@@ -28,5 +28,6 @@ export 'src/coach/ranges.dart';
 export 'src/coach/pushfold.dart';
 export 'src/coach/outs.dart';
 export 'src/coach/advisor.dart';
+export 'src/coach/solver_advice.dart';
 export 'src/coach/review.dart';
 export 'src/coach/drills.dart';

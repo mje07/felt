@@ -92,7 +92,7 @@ class _ReviewRow extends StatelessWidget {
     final p = Palette.of(context);
     final r = review;
     final street = '${r.street.name[0].toUpperCase()}${r.street.name.substring(1)}';
-    final agreed = r.grade == Grade.best || r.taken == r.recommended;
+    final agreed = r.grade == Grade.best || r.taken == r.recommended || (r.bySolver && r.grade == Grade.good);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -100,6 +100,10 @@ class _ReviewRow extends StatelessWidget {
           Text(street.toUpperCase(), style: Typo.caption(p.secondaryLabel).copyWith(letterSpacing: 0.8)),
           const SizedBox(width: Space.s),
           GradeBadge(grade: r.grade, compact: true),
+          if (r.bySolver) ...[
+            const SizedBox(width: 6),
+            _SolverTag(color: p.accent),
+          ],
           const Spacer(),
           if (r.lossBb != null && r.lossBb! >= 0.5)
             Text('−${r.lossBb!.toStringAsFixed(1)} bb', style: Typo.number(p.secondaryLabel, size: 12)),
@@ -109,7 +113,7 @@ class _ReviewRow extends StatelessWidget {
           TextSpan(text: 'You: ', style: Typo.callout(p.secondaryLabel)),
           TextSpan(text: r.taken, style: Typo.callout(p.label).copyWith(fontWeight: FontWeight.w600)),
           if (!agreed) ...[
-            TextSpan(text: '   Coach: ', style: Typo.callout(p.secondaryLabel)),
+            TextSpan(text: r.bySolver ? '   Solver: ' : '   Coach: ', style: Typo.callout(p.secondaryLabel)),
             TextSpan(text: r.recommended, style: Typo.callout(p.accent).copyWith(fontWeight: FontWeight.w600)),
           ],
         ])),
@@ -139,4 +143,27 @@ class _Fact extends StatelessWidget {
       TextSpan(text: value, style: Typo.number(p.label, size: 12)),
     ]));
   }
+}
+
+/// Marks a decision graded against an exact solve rather than the equity model.
+class _SolverTag extends StatelessWidget {
+  const _SolverTag({required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: 'Graded against a game-theory solve of this exact spot',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(CupertinoIcons.scope, size: 11, color: color),
+            const SizedBox(width: 3),
+            Text('Solver', style: Typo.caption(color).copyWith(fontWeight: FontWeight.w600)),
+          ]),
+        ),
+      );
 }

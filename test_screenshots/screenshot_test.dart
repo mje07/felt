@@ -264,7 +264,8 @@ void coachShots() {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1;
       final history = _simulatedHistory(200);
-      final hand = history.hands.lastWhere((h) => h.reviews.length >= 3 && h.reviews.any((r) => r.grade != Grade.best));
+      final hand = history.hands.lastWhere((h) => h.reviews.length >= 3 && h.reviews.any((r) => r.bySolver),
+          orElse: () => history.hands.lastWhere((h) => h.reviews.length >= 3 && h.reviews.any((r) => r.grade != Grade.best)));
       await tester.pumpWidget(_themed(
         dark,
         Builder(

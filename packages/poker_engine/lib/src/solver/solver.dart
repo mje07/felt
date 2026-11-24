@@ -798,6 +798,36 @@ extension SolverQueries on Solver {
     );
   }
 
+
+  /// For the hand [combo] of the player acting at [path]: the expected chips
+  /// of each action (then both play the average strategy), and how often the
+  /// solver takes each action with it. Null if the hand isn't in their range.
+  (List<double> ev, List<double> freq)? actionEvs(List<int> path, int combo) {
+    final nodes = nodesAt(path);
+    final n = nodes.last;
+    if (n.kind != NodeKind.action) return null;
+    final p = n.player, o = 1 - p;
+    final j = hands(p).indexOf(combo);
+    if (j < 0) return null;
+    final reach = reachAt(nodes);
+    var compatible = 0.0;
+    final (a, b) = comboCards[combo];
+    for (var k = 0; k < hands(o).length; k++) {
+      final (c, d) = comboCards[hands(o)[k]];
+      if (c == a || c == b || d == a || d == b) continue;
+      compatible += reach[o][k];
+    }
+    if (compatible <= 0) return null;
+    final sigma = averageStrategy(n);
+    final h = hands(p).length;
+    final evs = <double>[], freqs = <double>[];
+    for (var i = 0; i < n.actions.length; i++) {
+      final v = _values(n.children[i], p, reach[p], reach[o], false);
+      evs.add(v[j] / compatible);
+      freqs.add(sigma[i * h + j]);
+    }
+    return (evs, freqs);
+  }
   /// The solved strategy (average strategy sums of every node), for caching.
   Float32List exportStrategies() {
     final parts = <Float32List>[];

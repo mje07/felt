@@ -39,6 +39,10 @@ class BotContext {
     this.aggressorLastStreet = false,
     this.opponentFoldRatio = const [],
     this.aggressorPfrRatio = 1.0,
+    this.selfCombos = const [],
+    this.streetActions = const [],
+    this.streetStartPot = 0,
+    this.streetStartStack = 0,
   });
 
   /// Postflop: each live opponent's range as explicit combos, narrowed by
@@ -59,6 +63,17 @@ class BotContext {
   /// Preflop: how often the last raiser raises compared with a typical
   /// player (2.0 = twice as often, so a much wider range). From session reads.
   final double aggressorPfrRatio;
+
+  /// Postflop: our own range as the opponents see it (combos narrowed by our
+  /// actions on this board), for the solver.
+  final List<int> selfCombos;
+
+  /// This street so far, in order: (was it us, action, that player's chips
+  /// in on this street afterwards).
+  final List<(bool, ActionType, int)> streetActions;
+
+  /// Pot when this street began, and the effective stack behind then.
+  final int streetStartPot, streetStartStack;
 
   final int seat;
   final List<int> hole, board;
@@ -170,11 +185,21 @@ BotContext buildBotContext(HandState s, {TournamentInfo? tournament, TableReads?
   // against the board as it stood on that street.
   var combos = const <List<int>>[];
   var aggressorLastStreet = false;
+  var selfCombos = const <int>[];
+  // This street so far: (is it us, action, our street total afterwards).
+  final streetActions = <(bool, ActionType, int)>[];
+  for (final e in s.log) {
+    if (e is StreetDealt) streetActions.clear();
+    if (e is PlayerActed && e.street == s.street) streetActions.add((e.seat == me.index, e.type, e.streetBet));
+  }
+  final streetStartPot = s.pot - s.seats.fold<int>(0, (t, p) => t + p.streetBet);
   if (s.street != Street.preflop && s.street != Street.showdown) {
     final dead = [...me.hole, ...s.board];
     final byWidth = <double, List<int>>{};
     final current = {
       for (final p in live) p.index: byWidth.putIfAbsent(preWidth(p), () => preflopRange(preWidth(p), dead: dead)),
+      // Our own range as opponents see it (only the board is dead).
+      me.index: preflopRange(preWidth(me), dead: s.board),
     };
     var board = const <int>[];
     var lastAggr = -1, prevStreetAggr = -1;
@@ -203,6 +228,7 @@ BotContext buildBotContext(HandState s, {TournamentInfo? tournament, TableReads?
       }
     }
     combos = [for (final p in live) current[p.index]!];
+    selfCombos = current[me.index]!;
     // On the flop the previous street is preflop.
     aggressorLastStreet = s.street == Street.flop ? aggressor == me.index : prevStreetAggr == me.index;
   }
@@ -244,6 +270,10 @@ BotContext buildBotContext(HandState s, {TournamentInfo? tournament, TableReads?
     inPosition: s.street != Street.preflop && playersAfter == 0,
     aggressorLastStreet: aggressorLastStreet,
     opponentFoldRatio: [for (final p in live) reads?.of(p.name).foldRatio ?? 1.0],
+    selfCombos: selfCombos,
+    streetActions: streetActions,
+    streetStartPot: streetStartPot,
+    streetStartStack: min(me.stack + me.streetBet, live.fold<int>(0, (m, p) => max(m, p.stack + p.streetBet))),
     aggressorPfrRatio: aggressor >= 0 && aggressor != me.index ? reads?.of(s.seats[aggressor].name).pfrRatio ?? 1.0 : 1.0,
   );
 }

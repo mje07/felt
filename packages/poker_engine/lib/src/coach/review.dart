@@ -49,6 +49,7 @@ class DecisionReview {
     this.lossBb,
     this.equity,
     this.requiredEquity,
+    this.solverMix,
   });
 
   factory DecisionReview.fromJson(Map<String, Object?> j) => DecisionReview(
@@ -61,6 +62,7 @@ class DecisionReview {
         lossBb: (j['loss'] as num?)?.toDouble(),
         equity: (j['eq'] as num?)?.toDouble(),
         requiredEquity: (j['req'] as num?)?.toDouble(),
+        solverMix: j['mix'] as String?,
       );
 
   final Street street;
@@ -75,6 +77,12 @@ class DecisionReview {
   final double? lossBb;
   final double? equity, requiredEquity;
 
+  /// Set when the decision was graded by the solver: its mix for this hand,
+  /// e.g. "Bet 75% pot 62% · Check 38%".
+  final String? solverMix;
+
+  bool get bySolver => solverMix != null;
+
   Map<String, Object?> toJson() => {
         'street': street.name,
         'taken': taken,
@@ -85,6 +93,7 @@ class DecisionReview {
         if (lossBb != null) 'loss': double.parse(lossBb!.toStringAsFixed(2)),
         if (equity != null) 'eq': double.parse(equity!.toStringAsFixed(3)),
         if (requiredEquity != null) 'req': double.parse(requiredEquity!.toStringAsFixed(3)),
+        if (solverMix != null) 'mix': solverMix,
       };
 }
 
@@ -101,6 +110,7 @@ String _pct(double v) => '${(v * 100).round()}%';
 DecisionReview? gradeDecision(DecisionAnalysis a, PlayerAction taken) {
   if (a.shoveCall != null && taken.type != ActionType.check) return _gradeShoveCall(a, taken);
   if (a.pushFold) return _gradePushFold(a, taken);
+  if (a.solver != null && !a.isPreflop) return _gradeSolver(a, taken);
   return a.isPreflop ? _gradePreflop(a, taken) : _gradePostflop(a, taken);
 }
 
@@ -406,5 +416,65 @@ DecisionReview _gradeShoveCall(DecisionAnalysis a, PlayerAction taken) {
     explanation: text,
     equity: s.equity,
     lossBb: s.icm ? null : loss / a.bigBlind,
+  );
+}
+
+/// Heads-up river decisions graded against an exact solve of the spot.
+DecisionReview _gradeSolver(DecisionAnalysis a, PlayerAction taken) {
+  final s = a.solver!;
+  final i = s.indexOf(taken.type, taken.amount);
+  final b = s.best;
+  final loss = max(0.0, s.ev[b] - s.ev[i]);
+  final lossBb = loss / a.bigBlind;
+  final frac = loss / max(1, a.pot);
+  final freq = s.freq[i];
+
+  // Mixed strategies: anything the solver plays regularly is sound.
+  Grade grade;
+  if (freq >= 0.5 || lossBb < 0.1) {
+    grade = Grade.best;
+  } else if (freq >= 0.1 || frac <= 0.03) {
+    grade = Grade.good;
+  } else if (frac <= 0.1) {
+    grade = Grade.inaccuracy;
+  } else if (frac <= 0.3) {
+    grade = Grade.mistake;
+  } else {
+    grade = Grade.blunder;
+  }
+
+  final bestKind = s.actions[b].kind, takenAggressive = s.actions[i].aggressive;
+  final bestAggressive = s.actions[b].aggressive;
+  MistakeKind? kind;
+  if (grade.index >= Grade.inaccuracy.index) {
+    if (taken.type == ActionType.call && bestKind == 'fold') {
+      kind = MistakeKind.callingWithoutOdds;
+    } else if (taken.type == ActionType.fold) {
+      kind = MistakeKind.foldingWithOdds;
+    } else if (taken.type == ActionType.check && bestAggressive) {
+      kind = MistakeKind.missedValue;
+    } else if (taken.type == ActionType.call && bestAggressive) {
+      kind = MistakeKind.passiveWithStrong;
+    } else if (takenAggressive && !bestAggressive) {
+      kind = MistakeKind.overplayedWeak;
+    }
+  }
+
+  final takenLabel = a.describe(taken);
+  final text = freq >= 0.1
+      ? 'Solver: ${s.mix}. ${takenLabel.split(' ').first} is part of its strategy with this hand.'
+      : 'Solver: ${s.mix}. ${takenLabel.split(' ').first} costs about ${lossBb.toStringAsFixed(1)} bb '
+          'compared with ${s.label(b).toLowerCase()}.';
+  return DecisionReview(
+    street: a.street,
+    taken: takenLabel,
+    recommended: s.label(b),
+    grade: grade,
+    kind: kind,
+    explanation: text,
+    lossBb: lossBb,
+    equity: a.equity,
+    requiredEquity: a.requiredEquity,
+    solverMix: s.mix,
   );
 }
