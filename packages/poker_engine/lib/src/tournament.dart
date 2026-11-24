@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'bots/bot.dart';
+import 'bots/reads.dart';
 import 'cash_game.dart';
 import 'game_state.dart';
 import 'rng.dart';
@@ -206,6 +207,7 @@ class Tournament {
   /// decisions (used after the human is eliminated). Every remaining player
   /// must be a bot.
   void simulateRest({int maxHands = 20000}) {
+    final reads = TableReads();
     var hands = 0;
     while (!isFinished && hands++ < maxHands) {
       var s = startNextHand();
@@ -213,8 +215,9 @@ class Tournament {
         final p = seats[s.toAct];
         final bot = p.bot;
         if (bot == null) throw StateError('simulateRest needs bots only');
-        s = applyAction(s, bot.decide(buildBotContext(s), rng));
+        s = applyAction(s, bot.decide(buildBotContext(s, tournament: TournamentInfo(prizes: prizes, playersLeft: playersLeft), reads: reads), rng));
       }
+      reads.observe(s);
       settle(s);
     }
   }

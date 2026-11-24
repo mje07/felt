@@ -7,6 +7,7 @@ class Personality {
     required this.aggression,
     required this.bluffing,
     required this.stickiness,
+    this.adapts = false,
   });
 
   final String id, label;
@@ -23,12 +24,16 @@ class Personality {
   /// Reluctance to fold (calling-station factor).
   final double stickiness;
 
+  /// Reads opponents over the session and adjusts (bluffs folders, value-bets
+  /// callers). Fixed archetypes leave this off, which keeps them exploitable.
+  final bool adapts;
+
   static const rock = Personality(
       id: 'rock', label: 'Rock', looseness: 0.13, aggression: 0.45, bluffing: 0.03, stickiness: 0.0);
   static const tag = Personality(
-      id: 'tag', label: 'Shark', looseness: 0.21, aggression: 0.75, bluffing: 0.10, stickiness: 0.05);
+      id: 'tag', label: 'Shark', looseness: 0.25, aggression: 0.8, bluffing: 0.13, stickiness: 0.08, adapts: true);
   static const lag = Personality(
-      id: 'lag', label: 'Maverick', looseness: 0.34, aggression: 0.85, bluffing: 0.18, stickiness: 0.1);
+      id: 'lag', label: 'Maverick', looseness: 0.34, aggression: 0.85, bluffing: 0.18, stickiness: 0.1, adapts: true);
   static const station = Personality(
       id: 'station', label: 'Station', looseness: 0.45, aggression: 0.2, bluffing: 0.03, stickiness: 0.65);
   static const maniac = Personality(

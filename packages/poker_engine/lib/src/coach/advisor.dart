@@ -3,9 +3,9 @@ import 'dart:math';
 import '../bots/bot.dart';
 import '../bots/preflop_chart.dart';
 import '../equity.dart';
-import '../evaluator.dart';
 import '../game_state.dart';
 import '../icm.dart';
+import '../range_model.dart';
 import 'outs.dart';
 import 'pushfold.dart';
 import 'ranges.dart';
@@ -244,17 +244,20 @@ DecisionAnalysis analyzeDecision(BotContext ctx, {int samples = 2500, Random? rn
       effectiveStackBb: ctx.effectiveStackBb,
     );
   }
+  final combos = ctx.opponentCombos.isNotEmpty
+      ? ctx.opponentCombos
+      : [for (final w in ctx.opponentRanges) preflopRange(w, dead: [...ctx.hole, ...ctx.board])];
   final e = monteCarloEquity(
     hole: ctx.hole,
     board: ctx.board,
     opponents: ctx.opponents,
     iterations: samples,
     rng: r,
-    opponentRanges: ctx.opponentRanges,
+    opponentCombos: combos,
   ).equity;
   final called = [
     for (final q in calledFractions)
-      _continuingEquity(ctx.hole, ctx.board, ctx.opponentRanges, q, samples ~/ 2, r),
+      _continuingEquity(ctx.hole, ctx.board, combos, q, samples ~/ 2, r),
   ];
   return DecisionAnalysis._(
     street: ctx.street,
@@ -376,79 +379,17 @@ const calledFractions = [0.55, 0.3, 0.12];
 /// Our equity against opponents holding only the strongest [q] of their
 /// range *on this board* (made-hand strength now), which is what tends to
 /// continue against a bet.
-double _continuingEquity(List<int> hole, List<int> board, List<double> ranges, double q, int iterations, Random rng) {
-  final n = ranges.length;
-  if (n == 0) return 1;
-  final dead = {...hole, ...board};
-  int draw(Set<int> used) {
-    while (true) {
-      final c = rng.nextInt(52);
-      if (!used.contains(c)) return c;
-    }
-  }
-
-  // Sample a hand from an opponent's (preflop-shaped) range.
-  (int, int) sampleFromRange(double range, Set<int> used) {
-    var a = 0, b = 0;
-    for (var t = 0; t < 30; t++) {
-      a = draw(used);
-      b = draw({...used, a});
-      if (range >= 1.0 || preflopPercentile(a, b) <= range) break;
-    }
-    return (a, b);
-  }
-
-  // Per-opponent strength threshold: the (1 − q) quantile of current hand
-  // values across their range.
-  final thresholds = <int>[];
-  for (final range in ranges) {
-    final values = <int>[];
-    for (var i = 0; i < 200; i++) {
-      final (a, b) = sampleFromRange(range, dead);
-      values.add(evaluate([a, b, ...board]));
-    }
-    values.sort();
-    thresholds.add(values[((1 - q) * (values.length - 1)).floor()]);
-  }
-
-  final need = 5 - board.length;
-  var share = 0.0;
-  for (var it = 0; it < iterations; it++) {
-    final used = {...dead};
-    final opp = <List<int>>[];
-    for (var o = 0; o < n; o++) {
-      var hand = sampleFromRange(ranges[o], used);
-      for (var t = 0; t < 40 && evaluate([hand.$1, hand.$2, ...board]) < thresholds[o]; t++) {
-        hand = sampleFromRange(ranges[o], used);
-      }
-      used
-        ..add(hand.$1)
-        ..add(hand.$2);
-      opp.add([hand.$1, hand.$2]);
-    }
-    final full = [...board];
-    for (var i = 0; i < need; i++) {
-      final c = draw(used);
-      used.add(c);
-      full.add(c);
-    }
-    final mine = evaluate([...hole, ...full]);
-    var best = 0, ties = 0;
-    for (final h in opp) {
-      final v = evaluate([...h, ...full]);
-      if (v > best) {
-        best = v;
-        ties = 0;
-      }
-      if (v == mine) ties++;
-    }
-    if (mine > best) {
-      share += 1;
-    } else if (mine == best) {
-      share += 1 / (ties + 1);
-    }
-  }
-  return share / iterations;
+double _continuingEquity(List<int> hole, List<int> board, List<List<int>> ranges, double q, int iterations, Random rng) {
+  if (ranges.isEmpty) return 1;
+  final continuing = [for (final r in ranges) continuingRange(r, board, q)];
+  return monteCarloEquity(
+    hole: hole,
+    board: board,
+    opponents: ranges.length,
+    iterations: iterations,
+    rng: rng,
+    opponentCombos: continuing,
+  ).equity;
 }
 
 String _opponentNote(BotContext ctx) {

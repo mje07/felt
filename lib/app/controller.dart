@@ -215,6 +215,9 @@ class GameController extends ChangeNotifier {
   final bool useIsolates;
   final Random _rng;
 
+  /// What the bots have learned about everyone (you included) this session.
+  final reads = TableReads();
+
   /// Exactly one of these is set, depending on [TableConfig.mode].
   CashGame? cash;
   Tournament? tournament;
@@ -403,6 +406,7 @@ class GameController extends ChangeNotifier {
       }
       if (_disposed) return;
       lastHandReviews = List.unmodifiable(_handReviews);
+      reads.observe(s);
       unawaited(history.add(HandHistory.fromState(
         s,
         heroSeat: heroSeat,
@@ -464,7 +468,7 @@ class GameController extends ChangeNotifier {
 
   Future<PlayerAction> _askBot(HandState s) async {
     final bot = _players[s.toAct].bot!;
-    final ctx = buildBotContext(s);
+    final ctx = buildBotContext(s, tournament: _tournamentInfo, reads: reads);
     final think = Future<void>.delayed(
         settings.scaled(Duration(milliseconds: 450 + _rng.nextInt(850))));
     final Future<PlayerAction> decision;
@@ -563,7 +567,7 @@ class GameController extends ChangeNotifier {
 
   /// Coach analysis of the hero's spot (postflop runs Monte Carlo, so off the UI isolate).
   Future<DecisionAnalysis> _analyze(HandState s) {
-    final ctx = buildBotContext(s, tournament: _tournamentInfo);
+    final ctx = buildBotContext(s, tournament: _tournamentInfo, reads: reads);
     if (ctx.street == Street.preflop) return Future.value(analyzeDecision(ctx));
     if (!useIsolates) return Future.value(analyzeDecision(ctx, samples: 300, rng: _rng));
     return Isolate.run(() => analyzeDecision(ctx, samples: 2000));

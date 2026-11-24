@@ -3,6 +3,8 @@ import 'dart:math';
 import '../game_state.dart';
 import '../rules.dart';
 import '../stats.dart' show positionOf;
+import '../range_model.dart';
+import 'reads.dart';
 
 /// Everything a bot may know when deciding. Plain data (isolate-safe):
 /// it never exposes other players' hole cards.
@@ -32,7 +34,31 @@ class BotContext {
     this.committed = const [],
     this.allInAggressor,
     this.allInAggressorName,
+    this.opponentCombos = const [],
+    this.inPosition = false,
+    this.aggressorLastStreet = false,
+    this.opponentFoldRatio = const [],
+    this.aggressorPfrRatio = 1.0,
   });
+
+  /// Postflop: each live opponent's range as explicit combos, narrowed by
+  /// what they did on each street of *this* board (see `range_model.dart`).
+  /// Empty preflop, where [opponentRanges] widths are used instead.
+  final List<List<int>> opponentCombos;
+
+  /// Postflop: nobody left to act after us on this street.
+  final bool inPosition;
+
+  /// We made the last bet or raise on the previous street (we can barrel).
+  final bool aggressorLastStreet;
+
+  /// Per live opponent: how often they fold to bets compared with a typical
+  /// player (1.0 = average, 0.5 = half as often). From session reads.
+  final List<double> opponentFoldRatio;
+
+  /// Preflop: how often the last raiser raises compared with a typical
+  /// player (2.0 = twice as often, so a much wider range). From session reads.
+  final double aggressorPfrRatio;
 
   final int seat;
   final List<int> hole, board;
@@ -82,7 +108,9 @@ abstract interface class Bot {
 }
 
 /// Builds the bot's view of [s] for the player to act.
-BotContext buildBotContext(HandState s, {TournamentInfo? tournament}) {
+/// Pass [reads] (session-long tendencies) so ranges and bluffing adapt to
+/// how each opponent actually plays.
+BotContext buildBotContext(HandState s, {TournamentInfo? tournament, TableReads? reads}) {
   final legal = legalActions(s);
   final me = s.seats[s.toAct];
   final raisedPre = <int>{};
@@ -117,19 +145,67 @@ BotContext buildBotContext(HandState s, {TournamentInfo? tournament}) {
   final live = s.liveSeats.where((p) => p.index != me.index).toList();
   final playersAfter = live.where((p) => p.canAct && dist(p.index) > myDist).length;
 
-  // Preflop action sets a starting range; every postflop bet or raise
-  // narrows it further (people bet stronger hands).
+  // Preflop action sets a starting range, scaled by how loosely this player
+  // has been raising and calling (session reads); every postflop bet or
+  // raise narrows it further (people bet stronger hands).
+  double preWidth(Seat p) {
+    final t = reads?.of(p.name);
+    if (raisedPre.contains(p.index)) {
+      final ratio = t?.pfrRatio ?? 1.0;
+      return preflopRaises >= 2 ? (0.1 * ratio).clamp(0.03, 0.4) : (0.22 * ratio).clamp(0.06, 0.8);
+    }
+    if (calledPre.contains(p.index)) return (0.5 * (t?.vpip ?? 0.28) / 0.28).clamp(0.15, 1.0);
+    return 1.0;
+  }
+
   double rangeFor(Seat p) {
-    final base = raisedPre.contains(p.index)
-        ? (preflopRaises >= 2 ? 0.1 : 0.22)
-        : calledPre.contains(p.index)
-            ? 0.5
-            : 1.0;
+    final base = preWidth(p);
     final n = postflopAggression[p.index] ?? 0;
     return max(0.04, base * pow(0.55, n));
   }
 
   final ranges = [for (final p in live) rangeFor(p)];
+
+  // Postflop: explicit combo ranges, replaying each opponent's actions
+  // against the board as it stood on that street.
+  var combos = const <List<int>>[];
+  var aggressorLastStreet = false;
+  if (s.street != Street.preflop && s.street != Street.showdown) {
+    final dead = [...me.hole, ...s.board];
+    final byWidth = <double, List<int>>{};
+    final current = {
+      for (final p in live) p.index: byWidth.putIfAbsent(preWidth(p), () => preflopRange(preWidth(p), dead: dead)),
+    };
+    var board = const <int>[];
+    var lastAggr = -1, prevStreetAggr = -1;
+    var street = Street.preflop;
+    for (final e in s.log) {
+      if (e is StreetDealt) {
+        board = e.board;
+        prevStreetAggr = lastAggr;
+        lastAggr = -1;
+        street = e.street;
+      } else if (e is PlayerActed) {
+        final aggressive = e.type == ActionType.bet || e.type == ActionType.raise;
+        if (aggressive) lastAggr = e.seat;
+        if (street == Street.preflop || !current.containsKey(e.seat)) continue;
+        final action = switch (e.type) {
+          ActionType.bet => RangeAction.bet,
+          ActionType.raise => RangeAction.raise,
+          ActionType.call => RangeAction.call,
+          ActionType.check => RangeAction.check,
+          ActionType.fold => null,
+        };
+        if (action != null) {
+          final agg = reads?.of(s.seats[e.seat].name).aggressionRatio ?? 1.0;
+          current[e.seat] = narrowRange(current[e.seat]!, board, action, aggression: agg);
+        }
+      }
+    }
+    combos = [for (final p in live) current[p.index]!];
+    // On the flop the previous street is preflop.
+    aggressorLastStreet = s.street == Street.flop ? aggressor == me.index : prevStreetAggr == me.index;
+  }
   final active = [for (final p in s.seats) if (p.inHand) p.index];
   final myTotal = me.stack + me.streetBet;
   final biggestOther = live.fold(0, (m, p) => max(m, p.stack + p.streetBet));
@@ -164,6 +240,11 @@ BotContext buildBotContext(HandState s, {TournamentInfo? tournament}) {
         ? s.lastAggressor
         : null,
     allInAggressorName: s.lastAggressor >= 0 ? s.seats[s.lastAggressor].name : null,
+    opponentCombos: combos,
+    inPosition: s.street != Street.preflop && playersAfter == 0,
+    aggressorLastStreet: aggressorLastStreet,
+    opponentFoldRatio: [for (final p in live) reads?.of(p.name).foldRatio ?? 1.0],
+    aggressorPfrRatio: aggressor >= 0 && aggressor != me.index ? reads?.of(s.seats[aggressor].name).pfrRatio ?? 1.0 : 1.0,
   );
 }
 

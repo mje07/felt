@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'bots/preflop_chart.dart';
+import 'range_model.dart';
 import 'evaluator.dart';
 
 class EquityResult {
@@ -19,7 +19,11 @@ class EquityResult {
 ///
 /// [opponentRanges], when given, holds one value per opponent: the fraction of
 /// starting hands they are assumed to hold (1.0 = any two cards, 0.2 = the top
-/// 20% by preflop strength). Ranges are applied by rejection sampling.
+/// 20% by preflop strength).
+///
+/// [opponentCombos], when given, takes precedence: one explicit combo list
+/// per opponent (see `range_model.dart`), e.g. narrowed by their postflop
+/// actions. Hands are drawn exactly from these ranges.
 EquityResult monteCarloEquity({
   required List<int> hole,
   required List<int> board,
@@ -27,6 +31,7 @@ EquityResult monteCarloEquity({
   int iterations = 1000,
   Random? rng,
   List<double>? opponentRanges,
+  List<List<int>>? opponentCombos,
 }) {
   assert(opponents >= 1);
   final r = rng ?? Random();
@@ -34,6 +39,13 @@ EquityResult monteCarloEquity({
   for (final c in [...hole, ...board]) {
     deadMask |= 1 << c;
   }
+  final ranges = opponentCombos ??
+      (opponentRanges == null
+          ? null
+          : [
+              for (final w in opponentRanges)
+                w >= 1.0 ? null : preflopRange(w, dead: [...hole, ...board])
+            ].map((l) => l ?? const <int>[]).toList());
   final need = 5 - board.length;
   final hero = List<int>.filled(2 + 5, 0);
   final opp = List<int>.filled(2 + 5, 0);
@@ -50,12 +62,16 @@ EquityResult monteCarloEquity({
   for (var it = 0; it < iterations; it++) {
     var used = deadMask;
     for (var o = 0; o < opponents; o++) {
-      final range = opponentRanges == null ? 1.0 : opponentRanges[o];
-      int a = 0, b = 0;
-      for (var tries = 0; tries < 30; tries++) {
+      final list = ranges == null || o >= ranges.length ? const <int>[] : ranges[o];
+      final combo = list.isEmpty ? -1 : sampleCombo(list, used, r);
+      int a, b;
+      if (combo >= 0) {
+        a = comboA(combo);
+        b = comboB(combo);
+      } else {
+        // Any two cards (or the range is fully blocked).
         a = draw(used);
         b = draw(used | (1 << a));
-        if (range >= 1.0 || preflopPercentile(a, b) <= range) break;
       }
       used |= (1 << a) | (1 << b);
       oppHoles[o * 2] = a;
