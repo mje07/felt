@@ -285,4 +285,47 @@ void main() {
     expect(presetRaiseTo(l, 60, 0.1, 5), 50, reason: 'clamped to min-raise');
     expect(presetRaiseTo(l, 6000, 1.0, 5), 400, reason: 'clamped to stack');
   });
+
+  testWidgets('random opponents get real styles, and the labels can be hidden', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final labels = RegExp('(${Personality.all.map((p) => p.label).join('|')})\$');
+    Finder styleLabels() => find.textContaining(labels, findRichText: true);
+
+    Future<void> sitDown(Settings settings) async {
+      await tester.pumpWidget(_host(
+        settings,
+        TableScreen(
+          config: const TableConfig(seats: 6, style: 'random', difficulty: Difficulty.casual),
+          history: HistoryStore.memory(),
+          useIsolates: false,
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    await sitDown(Settings.memory());
+    expect(styleLabels(), findsNWidgets(5)); // one per opponent
+
+    final hidden = Settings.memory()..showOpponentStyles = false;
+    await sitDown(hidden);
+    expect(styleLabels(), findsNothing);
+
+    // Random tables really vary: across a few tables more than one style shows up.
+    final seen = <String>{};
+    for (var i = 0; i < 4; i++) {
+      final c = GameController(
+        config: const TableConfig(seats: 6, style: 'random'),
+        settings: Settings.memory(),
+        history: HistoryStore.memory(),
+        rng: Random(i),
+      );
+      seen.addAll(c.view.seats.where((s) => !s.isHuman).map((s) => s.style));
+      c.dispose();
+    }
+    expect(seen.length, greaterThan(1));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 10));
+  });
 }

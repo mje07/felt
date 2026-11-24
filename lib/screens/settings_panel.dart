@@ -124,6 +124,15 @@ class SettingsPanel extends StatelessWidget {
                 ),
               ),
               SettingRow(
+                label: 'Show opponent styles',
+                detail: 'Label each opponent with their playing style. Turn off to work it out yourself.',
+                trailing: FeltToggle(
+                  label: 'Show opponent styles',
+                  value: s.showOpponentStyles,
+                  onChanged: (v) => s.update((s) => s.showOpponentStyles = v),
+                ),
+              ),
+              SettingRow(
                 label: 'Reduce motion',
                 detail: 'Shorter, simpler animations.',
                 trailing: FeltToggle(

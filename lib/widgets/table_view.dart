@@ -429,7 +429,8 @@ class BotSeat extends StatelessWidget {
           width: 250,
           height: _plateH,
           child: Stack(clipBehavior: Clip.none, children: [
-            Center(child: _Nameplate(seat: seat, active: false, subtitle: seat.style)),
+            Center(child: _Nameplate(
+                seat: seat, active: false, subtitle: SettingsScope.of(context).showOpponentStyles ? seat.style : null)),
             Positioned(
               left: -70,
               right: -70,
@@ -488,7 +489,8 @@ class BotSeat extends StatelessWidget {
                   ),
                 ),
               ),
-            Center(child: _Nameplate(seat: seat, active: active, subtitle: seat.style)),
+            Center(child: _Nameplate(
+                seat: seat, active: active, subtitle: SettingsScope.of(context).showOpponentStyles ? seat.style : null)),
             Positioned(
               left: -70,
               right: -70,

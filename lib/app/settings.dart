@@ -55,6 +55,9 @@ class Settings extends ChangeNotifier {
   /// Check GitHub for new versions and install them when Felt starts.
   bool autoUpdate = true;
 
+  /// Label each opponent at the table with their playing style.
+  bool showOpponentStyles = true;
+
   void _read() {
     final p = _prefs;
     if (p == null) return;
@@ -68,6 +71,7 @@ class Settings extends ChangeNotifier {
     showGradesLive = p.getBool('gradesLive') ?? false;
     showCoachAtTable = p.getBool('coachAtTable') ?? true;
     autoUpdate = p.getBool('autoUpdate') ?? true;
+    showOpponentStyles = p.getBool('opponentStyles') ?? true;
     playerName = p.getString('playerName') ?? 'You';
   }
 
@@ -85,6 +89,7 @@ class Settings extends ChangeNotifier {
       p.setBool('gradesLive', showGradesLive);
       p.setBool('coachAtTable', showCoachAtTable);
       p.setBool('autoUpdate', autoUpdate);
+      p.setBool('opponentStyles', showOpponentStyles);
       p.setString('playerName', playerName);
     }
     notifyListeners();

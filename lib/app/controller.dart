@@ -33,7 +33,8 @@ class TableConfig {
   final GameMode mode;
   final int seats, smallBlind, bigBlind, buyInBigBlinds;
 
-  /// 'mixed' or a [Personality.id].
+  /// 'mixed' (a fixed spread of styles), 'random' (each bot's style drawn at
+  /// random) or a [Personality.id].
   final String style;
   final Difficulty difficulty;
 
@@ -170,7 +171,9 @@ class GameController extends ChangeNotifier {
       if (i == heroSeat) {
         players.add(TablePlayer(name: settings.playerName, stack: stack, isHuman: true));
       } else {
-        final style = config.style == 'mixed'
+        final style = config.style == 'random'
+            ? Personality.all[_rng.nextInt(Personality.all.length)]
+            : config.style == 'mixed'
             ? _mixedStyles[(i - 1) % _mixedStyles.length]
             : Personality.byId(config.style);
         players.add(TablePlayer(

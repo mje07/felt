@@ -25,6 +25,7 @@ const _sngBuyIns = [100, 500, 2500, 10000];
 
 const _styleBlurb = {
   'mixed': 'A table of different styles: the most realistic game.',
+  'random': 'Every opponent gets a random style. Work out who is who as you play.',
   'rock': 'Plays very few hands and rarely bluffs.',
   'tag': 'Tight and aggressive: selective, then hard to push around.',
   'lag': 'Plays lots of hands and keeps the pressure on.',
@@ -240,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               detail: _styleBlurb[_style],
                               below: ChoiceChips<String>(
                                 value: _style,
-                                options: {'mixed': 'Mixed', for (final s in Personality.all) s.id: s.label},
+                                options: {'mixed': 'Mixed', 'random': 'Random', for (final s in Personality.all) s.id: s.label},
                                 onChanged: (v) => setState(() => _style = v),
                               ),
                             ),
