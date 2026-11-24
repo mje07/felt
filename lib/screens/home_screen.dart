@@ -274,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: Typo.callout(p.destructive)),
                         ],
                         const SizedBox(height: Space.m),
-                        Row(mainAxisSize: MainAxisSize.min, children: [
+                        Wrap(alignment: WrapAlignment.center, children: [
                           PillButton(
                             label: 'Training',
                             style: PillStyle.plain,
