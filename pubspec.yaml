@@ -39,6 +39,7 @@ dependencies:
   poker_engine:
     path: packages/poker_engine
   flutter_soloud: ^5.3.2
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:

@@ -7,6 +7,8 @@ import '../app/settings.dart';
 import '../app/sounds.dart';
 import '../app/theme.dart';
 import '../app/tournament_store.dart';
+import '../app/updater.dart';
+import '../app/version.dart';
 import '../widgets/common.dart';
 import '../widgets/controls.dart';
 import '../widgets/playing_card.dart';
@@ -163,6 +165,8 @@ class SettingsPanel extends StatelessWidget {
             _DataCard(history: history!),
           ],
           const SizedBox(height: Space.l),
+          _UpdatesCard(settings: s),
+          const SizedBox(height: Space.l),
           const SettingsCard(
             title: 'Keyboard',
             icon: CupertinoIcons.keyboard,
@@ -318,6 +322,72 @@ class _DataCardState extends State<_DataCard> {
             Text(_done!, style: Typo.callout(p.secondaryLabel)),
           ]),
       ],
+    );
+  }
+}
+
+/// Version, automatic updates and a manual check.
+class _UpdatesCard extends StatelessWidget {
+  const _UpdatesCard({required this.settings});
+  final Settings settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final u = Updater.current;
+    return ListenableBuilder(
+      listenable: u,
+      builder: (context, _) {
+        final v = u.latestVersion;
+        final status = switch (u.status) {
+          UpdateStatus.idle => 'You have Felt $appVersion.',
+          UpdateStatus.checking => 'Checking for updates…',
+          UpdateStatus.upToDate => "You're up to date.",
+          UpdateStatus.downloading => 'Downloading Felt $v… ${(u.progress * 100).round()}%',
+          UpdateStatus.ready => 'Felt $v is downloaded and installs when you restart.',
+          UpdateStatus.available => Updater.canSelfUpdate
+              ? 'Felt $v is available to download.'
+              : 'Felt $v is available. This copy wasn\'t installed with Setup, so update it yourself.',
+          UpdateStatus.failed => "Couldn't check for updates. Are you online?",
+        };
+        final Widget action = switch (u.status) {
+          UpdateStatus.ready => PillButton(
+              label: 'Restart to update', style: PillStyle.filled, minWidth: 0, height: 34, onPressed: u.installNow),
+          UpdateStatus.available => PillButton(
+              label: 'Download',
+              style: PillStyle.tinted,
+              minWidth: 0,
+              height: 34,
+              onPressed: () => openInBrowser(u.releasePageUrl)),
+          _ => PillButton(
+              label: 'Check now',
+              style: PillStyle.tinted,
+              minWidth: 0,
+              height: 34,
+              onPressed: u.enabled && u.status != UpdateStatus.checking && u.status != UpdateStatus.downloading
+                  ? u.check
+                  : null),
+        };
+        return SettingsCard(
+          title: 'Updates',
+          icon: CupertinoIcons.arrow_down_circle_fill,
+          children: [
+            SettingRow(
+              label: 'Update automatically',
+              detail: 'Checks GitHub for new versions and installs them when Felt starts. '
+                  'Nothing about you or your games is sent.',
+              trailing: FeltToggle(
+                label: 'Update automatically',
+                value: settings.autoUpdate,
+                onChanged: (on) {
+                  settings.update((s) => s.autoUpdate = on);
+                  if (on) u.check();
+                },
+              ),
+            ),
+            SettingRow(label: 'Felt $appVersion', detail: status, trailing: action),
+          ],
+        );
+      },
     );
   }
 }

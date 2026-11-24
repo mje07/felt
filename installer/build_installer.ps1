@@ -8,6 +8,9 @@ Set-Location $root
 $versionLine = Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1
 $version = ($versionLine.Matches[0].Groups[1].Value -split '\+')[0]
 Write-Host "Building Felt $version"
+# The app compares itself against GitHub releases using lib/app/version.dart.
+$appVersion = (Select-String -Path lib\app\version.dart -Pattern "appVersion = '([^']+)'").Matches[0].Groups[1].Value
+if ($appVersion -ne $version) { throw "lib/app/version.dart says $appVersion but pubspec.yaml says $version; update both." }
 
 # Tools.
 $flutter = (Get-Command flutter -ErrorAction SilentlyContinue).Source

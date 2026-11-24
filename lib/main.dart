@@ -7,6 +7,7 @@ import 'app/settings.dart';
 import 'app/sounds.dart';
 import 'app/theme.dart';
 import 'app/tournament_store.dart';
+import 'app/updater.dart';
 import 'screens/home_screen.dart';
 
 Future<void> main() async {
@@ -17,6 +18,7 @@ Future<void> main() async {
   await DrillProgress.load();
   await Bankroll.load();
   await TournamentStore.open();
+  await Updater.start(settings);
   runApp(FeltApp(settings: settings, history: history, sounds: sounds));
 }
 

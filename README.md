@@ -95,9 +95,24 @@ The installer:
 - registers an uninstaller in Settings → Apps
 - bundles the Visual C++ runtime, so it works on a clean PC
 - leaves your saved hands, stats and bankroll in place when you uninstall
+- updates an existing install in place (used by the app's automatic updates)
 
 The installer isn't code-signed, so SmartScreen shows "Windows protected your PC" the first time (More info → Run anyway). A code-signing certificate removes that.
 The app icon comes from `tool/icon/` (`flutter test tool/icon/render_icon_test.dart`, then `dart tool/icon/make_ico.dart`).
+
+### Updates
+
+`lib/app/updater.dart` asks GitHub for the latest release when Felt starts, then every 6 hours. This is Felt's only network request, and it sends nothing about the player or their games. It can be turned off in Settings → Updates.
+
+- **Windows, installed with Setup.exe:** the new installer downloads in the background. It's only used if it comes from this repository's releases and its SHA-256 matches the digest GitHub publishes for it, and it's checked again before it runs.
+  - It installs silently the next time Felt starts, or straight away with "Restart to update".
+  - The updater passes `/RELAUNCH=1`, so the new version starts afterwards. Ordinary silent installs don't launch Felt.
+- **Linux, or development builds:** Felt shows that a new version is available and links to the release.
+
+To publish an update:
+1. Bump `version:` in `pubspec.yaml` and `appVersion` in `lib/app/version.dart`. The build script and a test check that the two match.
+2. Build the installer.
+3. Attach `Felt-Setup-<version>.exe` to a GitHub release tagged `v<version>`.
 
 Windows needs Visual Studio (or Build Tools) with the *Desktop development with C++* workload, plus **Developer Mode** turned on (plugins need symlinks).
 Linux needs `clang cmake ninja-build pkg-config libgtk-3-dev`.

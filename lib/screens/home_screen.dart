@@ -6,6 +6,7 @@ import '../app/controller.dart';
 import '../app/history_store.dart';
 import '../app/settings.dart';
 import '../app/theme.dart';
+import '../app/updater.dart';
 import '../widgets/common.dart';
 import '../widgets/controls.dart';
 import '../widgets/playing_card.dart';
@@ -155,6 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text("No-Limit Texas Hold'em", style: Typo.body(p.secondaryLabel)),
                         const SizedBox(height: Space.m),
                         _BankrollLine(bankroll: bankroll),
+                        const _UpdateBanner(),
                         const SizedBox(height: Space.xl),
                         SettingsCard(
                           title: 'New table',
@@ -354,6 +356,58 @@ class _HeroCards extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A quiet line under the bankroll when a new version is downloading, ready
+/// to install, or available to download.
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final u = Updater.current;
+    return ListenableBuilder(
+      listenable: u,
+      builder: (context, _) {
+        final p = Palette.of(context);
+        final v = u.latestVersion;
+        final (String text, Widget? action) = switch (u.status) {
+          UpdateStatus.downloading => ('Downloading Felt $v… ${(u.progress * 100).round()}%', null),
+          UpdateStatus.ready => (
+              'Felt $v is ready',
+              PillButton(
+                label: 'Restart to update',
+                style: PillStyle.filled,
+                minWidth: 0,
+                height: 30,
+                onPressed: u.installNow,
+              ),
+            ),
+          UpdateStatus.available => (
+              'Felt $v is available',
+              PillButton(
+                label: 'Download',
+                style: PillStyle.plain,
+                minWidth: 0,
+                height: 30,
+                onPressed: () => openInBrowser(u.releasePageUrl),
+              ),
+            ),
+          _ => ('', null),
+        };
+        if (text.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: Space.s),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(CupertinoIcons.arrow_down_circle_fill, size: 16, color: p.accent),
+            const SizedBox(width: 6),
+            Text(text, style: Typo.callout(p.secondaryLabel)),
+            if (action != null) ...[const SizedBox(width: Space.s), action],
+          ]),
+        );
+      },
     );
   }
 }

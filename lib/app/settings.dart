@@ -52,6 +52,9 @@ class Settings extends ChangeNotifier {
   /// background so statistics stay complete; this only controls display.
   bool showCoachAtTable = true;
 
+  /// Check GitHub for new versions and install them when Felt starts.
+  bool autoUpdate = true;
+
   void _read() {
     final p = _prefs;
     if (p == null) return;
@@ -64,6 +67,7 @@ class Settings extends ChangeNotifier {
     volume = p.getDouble('volume') ?? 0.8;
     showGradesLive = p.getBool('gradesLive') ?? false;
     showCoachAtTable = p.getBool('coachAtTable') ?? true;
+    autoUpdate = p.getBool('autoUpdate') ?? true;
     playerName = p.getString('playerName') ?? 'You';
   }
 
@@ -80,6 +84,7 @@ class Settings extends ChangeNotifier {
       p.setDouble('volume', volume);
       p.setBool('gradesLive', showGradesLive);
       p.setBool('coachAtTable', showCoachAtTable);
+      p.setBool('autoUpdate', autoUpdate);
       p.setString('playerName', playerName);
     }
     notifyListeners();
