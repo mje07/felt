@@ -16,6 +16,8 @@ class HandHistory {
     this.reviews = const [],
     this.mode = 'cash',
     this.level,
+    this.source,
+    this.sourceId,
   });
 
   factory HandHistory.fromState(HandState s,
@@ -47,6 +49,8 @@ class HandHistory {
         heroHole: (j['hole'] as List?)?.cast<int>(),
         mode: (j['mode'] as String?) ?? 'cash',
         level: j['level'] as int?,
+        source: j['source'] as String?,
+        sourceId: j['sourceId'] as String?,
         reviews: [
           for (final r in (j['reviews'] as List?) ?? const [])
             DecisionReview.fromJson((r as Map).cast<String, Object?>()),
@@ -74,6 +78,11 @@ class HandHistory {
   final int? level;
   bool get isTournament => mode == 'sng';
 
+  /// Where an imported hand came from ('PokerStars', 'GGPoker'); null for
+  /// hands played in Felt. [sourceId] is the site's hand number.
+  final String? source, sourceId;
+  bool get isImported => source != null;
+
   Map<String, Object?> toJson() => {
         'hand': handNumber,
         'at': playedAt.toIso8601String(),
@@ -85,6 +94,8 @@ class HandHistory {
         if (reviews.isNotEmpty) 'reviews': [for (final r in reviews) r.toJson()],
         if (mode != 'cash') 'mode': mode,
         if (level != null) 'level': level,
+        if (source != null) 'source': source,
+        if (sourceId != null) 'sourceId': sourceId,
       };
 
   String encode() => jsonEncode(toJson());

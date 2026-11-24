@@ -19,6 +19,8 @@ import 'package:felt/screens/equity_lab_screen.dart';
 import 'package:felt/screens/settings_panel.dart';
 import 'package:felt/screens/study_screen.dart';
 import 'package:felt/screens/spot_trainer_screen.dart';
+import 'package:felt/screens/replayer_screen.dart';
+import 'package:flutter/services.dart';
 import 'package:felt/screens/stats_screen.dart';
 import 'package:felt/screens/training_screen.dart';
 import 'package:felt/widgets/common.dart' show PillButton;
@@ -29,7 +31,6 @@ import 'package:felt/widgets/controls.dart';
 import 'package:flutter/gestures.dart';
 import 'package:felt/widgets/action_bar.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poker_engine/poker_engine.dart';
 
@@ -77,6 +78,7 @@ void main() {
   suiteShots();
   studyShots();
   trainerShots();
+  importShots();
   settingsShots();
   historyShots();
   sngShots();
@@ -351,6 +353,8 @@ void historyShots() {
       await tester.pumpAndSettle();
       // Expand the most recent graded hand.
       final graded = history.hands.reversed.firstWhere((h) => h.reviews.length >= 2);
+      await tester.ensureVisible(find.text('Hand #${graded.handNumber}'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Hand #${graded.handNumber}'));
       await tester.pumpAndSettle();
       await _snap(tester, 'history_$mode');
@@ -549,6 +553,31 @@ void trainerShots() {
       }
       await wait();
       await _snap(tester, 'trainer_$mode');
+    });
+  }
+}
+
+void importShots() {
+  final hand = importHandHistories(
+    File('packages/poker_engine/test/fixtures/sample_hands.txt').readAsStringSync(),
+    review: true,
+    samples: 300,
+  ).hands.first;
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+    testWidgets('replayer $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1100);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(_themed(dark, ReplayerScreen(hand: hand)));
+      // Step to the river bet, which the coach graded.
+      final frames = buildReplay(hand);
+      final target = frames.lastIndexWhere((f) => f.review != null);
+      for (var i = 0; i < target; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      }
+      await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 3)));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'replayer_$mode');
     });
   }
 }

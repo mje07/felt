@@ -38,6 +38,10 @@ HandState startHand({
   required int smallBlind,
   required int bigBlind,
   int ante = 0,
+
+  /// Every player posts [ante] (older tournament format) instead of the big
+  /// blind posting it for the table.
+  bool anteFromEveryone = false,
   required int handNumber,
   Random? rng,
   List<int>? deck,
@@ -88,10 +92,20 @@ HandState startHand({
     log.add(BlindPosted(seat, a, isBig: big));
   }
 
+  if (ante > 0 && anteFromEveryone) {
+    for (final s in seats) {
+      if (!s.inHand) continue;
+      final a = min(ante, s.stack);
+      s.stack -= a;
+      s.totalBet += a;
+      if (s.stack == 0) s.allIn = true;
+      log.add(AntePosted(s.index, a));
+    }
+  }
   post(sbSeat, smallBlind, false);
   post(bbSeat, bigBlind, true);
   // Big-blind ante: dead money (counts towards the pot, not the street bet).
-  if (ante > 0) {
+  if (ante > 0 && !anteFromEveryone) {
     final b = seats[bbSeat];
     final a = min(ante, b.stack);
     if (a > 0) {

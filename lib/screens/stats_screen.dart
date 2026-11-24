@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:poker_engine/poker_engine.dart';
 
@@ -11,6 +13,7 @@ import '../widgets/charts.dart';
 import '../widgets/controls.dart';
 import '../widgets/review_panel.dart';
 import 'range_screen.dart';
+import 'spot_trainer_screen.dart';
 import 'training_screen.dart';
 
 enum StatsRange {
@@ -21,6 +24,16 @@ enum StatsRange {
   const StatsRange(this.label, this.count);
   final String label;
   final int? count;
+}
+
+/// Which hands to analyse: played in Felt, imported from a site, or both.
+enum StatsSource {
+  all('Everything'),
+  felt('Felt'),
+  imported('Imported');
+
+  const StatsSource(this.label);
+  final String label;
 }
 
 enum StatsMode {
@@ -43,18 +56,23 @@ class StatsScreen extends StatefulWidget {
 class _StatsScreenState extends State<StatsScreen> {
   StatsRange _range = StatsRange.all;
   StatsMode _mode = StatsMode.all;
+  StatsSource _source = StatsSource.all;
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     final all = [
       for (final h in widget.history.hands)
-        if (_mode == StatsMode.all || (_mode == StatsMode.sng) == h.isTournament) h
+        if ((_mode == StatsMode.all || (_mode == StatsMode.sng) == h.isTournament) &&
+            (_source == StatsSource.all || (_source == StatsSource.imported) == h.isImported))
+          h
     ];
     final n = _range.count;
     final hands = n == null || all.length <= n ? all : all.sublist(all.length - n);
     final stats = computeStats(hands);
     final profile = profileFor(stats);
+    final leaks = findLeaks(hands);
+    final hasImported = widget.history.hands.any((h) => h.isImported);
 
     return CupertinoPageScaffold(
       backgroundColor: p.isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7),
@@ -75,6 +93,14 @@ class _StatsScreenState extends State<StatsScreen> {
                     ]),
                   ),
                   const Spacer(),
+                  if (hasImported) ...[
+                    ChoiceChips<StatsSource>(
+                      value: _source,
+                      options: {for (final s in StatsSource.values) s: s.label},
+                      onChanged: (v) => setState(() => _source = v),
+                    ),
+                    const SizedBox(width: Space.l),
+                  ],
                   ChoiceChips<StatsMode>(
                     value: _mode,
                     options: {for (final m in StatsMode.values) m: m.label},
@@ -107,7 +133,7 @@ class _StatsScreenState extends State<StatsScreen> {
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 1080),
-                          child: _Body(stats: stats, profile: profile, history: widget.history, mode: _mode),
+                          child: _Body(stats: stats, profile: profile, history: widget.history, mode: _mode, leaks: leaks),
                         ),
                       ),
                     ),
@@ -139,7 +165,9 @@ class _Empty extends StatelessWidget {
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.stats, required this.profile, required this.history, required this.mode});
+  const _Body(
+      {required this.stats, required this.profile, required this.history, required this.mode, this.leaks = const []});
+  final List<Leak> leaks;
   final PlayerStats stats;
   final PlayerProfile? profile;
   final HistoryStore history;
@@ -174,6 +202,10 @@ class _Body extends StatelessWidget {
           if (stats.decisions > 0) ...[
             const SizedBox(height: Space.l),
             _DecisionCard(stats: stats, history: history),
+          ],
+          if (leaks.isNotEmpty) ...[
+            const SizedBox(height: Space.l),
+            _LeaksCard(leaks: leaks, history: history),
           ],
           const SizedBox(height: Space.l),
           _Card(
@@ -706,6 +738,71 @@ class _BankrollCard extends StatelessWidget {
         valueLabel: (v) => '${formatChips(v.round())} chips',
         axisLabel: compact,
       ),
+    );
+  }
+}
+
+/// The coach's mistakes grouped into leaks, ranked by what they cost.
+class _LeaksCard extends StatelessWidget {
+  const _LeaksCard({required this.leaks, required this.history});
+  final List<Leak> leaks;
+  final HistoryStore history;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final top = leaks.take(6).toList();
+    final worst = top.map((l) => l.bbPer100).fold(0.0, math.max);
+    return _Card(
+      title: 'Leak finder',
+      subtitle: 'Where your graded decisions lose the most, per 100 hands',
+      child: Column(children: [
+        for (final (i, l) in top.indexed) ...[
+          if (i > 0) Container(height: 0.5, color: p.separator),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Space.s),
+            child: Row(children: [
+              Expanded(
+                flex: 5,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(l.title, style: Typo.body(p.label)),
+                  Text(l.lostBb > 0 ? '${l.spots} spots · ${l.lostBb.toStringAsFixed(1)} bb given up' : '${l.spots} spots',
+                      style: Typo.caption(p.secondaryLabel)),
+                ]),
+              ),
+              Expanded(
+                flex: 3,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: worst <= 0 ? 0.02 : (l.bbPer100 / worst).clamp(0.02, 1.0),
+                    child: Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                          color: ChartColors.of(context).negative, borderRadius: BorderRadius.circular(4)),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 96,
+                child: Text(l.bbPer100 > 0 ? '−${l.bbPer100.toStringAsFixed(1)} bb/100' : '',
+                    textAlign: TextAlign.right, style: Typo.number(p.label, size: 13)),
+              ),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 30),
+                onPressed: () => Navigator.of(context).push(CupertinoPageRoute<void>(
+                    builder: (_) => l.street == Street.preflop
+                        ? TrainingScreen(history: history, startWith: drillFor(l.kind))
+                        : const SpotTrainerScreen())),
+                child: Text(l.street == Street.preflop ? 'Practise' : 'Train this',
+                    style: Typo.callout(p.accent).copyWith(fontWeight: FontWeight.w600)),
+              ),
+            ]),
+          ),
+        ],
+      ]),
     );
   }
 }

@@ -1,0 +1,137 @@
+PokerStars Hand #250000000001:  Hold'em No Limit ($0.05/$0.10 USD) - 2024/03/01 20:15:02 ET
+Table 'Alcyone II' 6-max Seat #3 is the button
+Seat 1: Villain1 ($10.00 in chips)
+Seat 2: Villain2 ($12.40 in chips)
+Seat 3: Hero ($10.00 in chips)
+Seat 4: Villain4 ($8.75 in chips)
+Seat 5: Villain5 ($10.00 in chips)
+Seat 6: Villain6 ($10.00 in chips)
+Villain4: posts small blind $0.05
+Villain5: posts big blind $0.10
+*** HOLE CARDS ***
+Dealt to Hero [Ah Kd]
+Villain6: folds
+Villain1: folds
+Villain2: folds
+Hero: raises $0.20 to $0.30
+Villain4: folds
+Villain5: calls $0.20
+*** FLOP *** [As 7c 2d]
+Villain5: checks
+Hero: bets $0.30
+Villain5: calls $0.30
+*** TURN *** [As 7c 2d] [9h]
+Villain5: checks
+Hero: bets $0.75
+Villain5: calls $0.75
+*** RIVER *** [As 7c 2d 9h] [3s]
+Villain5: checks
+Hero: bets $1.50
+Villain5: calls $1.50
+*** SHOW DOWN ***
+Hero: shows [Ah Kd] (a pair of Aces)
+Villain5: shows [Ac Td] (a pair of Aces - lower kicker)
+Hero collected $5.53 from pot
+*** SUMMARY ***
+Total pot $5.75 | Rake $0.22
+Board [As 7c 2d 9h 3s]
+Seat 3: Hero (button) showed [Ah Kd] and won ($5.53) with a pair of Aces
+Seat 5: Villain5 (big blind) showed [Ac Td] and lost with a pair of Aces
+
+
+
+PokerStars Hand #250000000002:  Hold'em No Limit ($0.05/$0.10 USD) - 2024/03/01 20:16:10 ET
+Table 'Alcyone II' 6-max Seat #4 is the button
+Seat 1: Villain1 ($10.00 in chips)
+Seat 2: Villain2 ($12.40 in chips)
+Seat 3: Hero ($12.68 in chips)
+Seat 4: Villain4 ($8.70 in chips)
+Seat 5: Villain5 ($7.15 in chips)
+Seat 6: Villain6 ($10.00 in chips) is sitting out
+Villain5: posts small blind $0.05
+Villain1: posts big blind $0.10
+*** HOLE CARDS ***
+Dealt to Hero [7c 2d]
+Villain2: raises $0.15 to $0.25
+Hero: folds
+Villain4: folds
+Villain5: folds
+Villain1: folds
+Uncalled bet ($0.15) returned to Villain2
+Villain2 collected $0.25 from pot
+Villain2: doesn't show hand
+*** SUMMARY ***
+Total pot $0.25 | Rake $0
+Seat 2: Villain2 collected ($0.25)
+
+
+
+PokerStars Hand #250000000003: Tournament #3500000000, $1.00+$0.10 USD Hold'em No Limit - Level IV (50/100) - 2024/03/02 18:00:00 ET
+Table '3500000000 1' 9-max Seat #1 is the button
+Seat 1: Alice (2000 in chips)
+Seat 2: Bob (1500 in chips)
+Seat 3: Hero (800 in chips)
+Alice: posts the ante 10
+Bob: posts the ante 10
+Hero: posts the ante 10
+Bob: posts small blind 50
+Hero: posts big blind 100
+*** HOLE CARDS ***
+Dealt to Hero [Qs Qd]
+Alice: raises 200 to 300
+Bob: folds
+Hero: raises 490 to 790 and is all-in
+Alice: calls 490
+*** FLOP *** [2c 5h 9s]
+*** TURN *** [2c 5h 9s] [Kd]
+*** RIVER *** [2c 5h 9s Kd] [Kh]
+*** SHOW DOWN ***
+Hero: shows [Qs Qd] (two pair, Kings and Queens)
+Alice: shows [Ah Js] (a pair of Kings)
+Hero collected 1660 from pot
+*** SUMMARY ***
+Total pot 1660 | Rake 0
+Board [2c 5h 9s Kd Kh]
+
+
+
+Poker Hand #RC1234567890: Hold'em No Limit ($0.02/$0.05) - 2024/03/03 10:00:00
+Table 'RushAndCash12345' 6-max Seat #1 is the button
+Seat 1: 1a2b3c ($5.00 in chips)
+Seat 2: Hero ($5.00 in chips)
+Seat 3: 4d5e6f ($5.00 in chips)
+Hero: posts small blind $0.02
+4d5e6f: posts big blind $0.05
+*** HOLE CARDS ***
+Dealt to 1a2b3c 
+Dealt to Hero [Td Th]
+Dealt to 4d5e6f 
+1a2b3c: folds
+Hero: raises $0.10 to $0.15
+4d5e6f: calls $0.10
+*** FLOP *** [Jc 8d 3h]
+Hero: bets $0.10
+4d5e6f: folds
+Uncalled bet ($0.10) returned to Hero
+*** SHOWDOWN ***
+Hero collected $0.30 from pot
+*** SUMMARY ***
+Total pot $0.30 | Rake $0 | Jackpot $0 | Bingo $0
+
+
+
+PokerStars Hand #250000000005:  Hold'em No Limit ($0.05/$0.10 USD) - 2024/03/01 21:00:00 ET
+Table 'Alcyone II' 6-max Seat #1 is the button
+Seat 1: Villain1 ($10.00 in chips)
+Seat 2: Villain2 ($10.00 in chips)
+Seat 3: Hero ($10.00 in chips)
+Seat 4: Villain4 ($10.00 in chips)
+Villain2: posts small blind $0.05
+Hero: posts big blind $0.10
+Villain4: posts straddle $0.20
+*** HOLE CARDS ***
+Dealt to Hero [9c 9d]
+Villain4: folds
+Villain1: folds
+Villain2: folds
+Hero: folds
