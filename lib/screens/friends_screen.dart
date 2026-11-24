@@ -71,6 +71,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
   String? _error;
   var _busy = false;
 
+  /// Shown while a sleeping invite-code server wakes up.
+  String? _waking;
+
   @override
   void initState() {
     super.initState();
@@ -131,7 +134,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final relay = relayBase(relayUrl);
     if (relay != null) {
       try {
-        await host.openRelay(relay);
+        await _wakeNotice(host.openRelay(relay));
       } catch (_) {
         _relayError = 'Couldn\'t reach the invite-code server at ${relay.host}, so there\'s no code this time. '
             'Friends can still join on your network or by address.';
@@ -156,13 +159,30 @@ class _FriendsScreenState extends State<FriendsScreen> {
     if (c != null && c.started && ModalRoute.of(context)?.isCurrent == true) _sitAtFriendsTable(c);
   }
 
+  /// Runs [f], explaining the wait if a free-tier relay is slow to wake.
+  Future<T> _wakeNotice<T>(Future<T> f) async {
+    final timer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() => _waking = 'Waking up the invite-code server. On a free host this can take up to a minute…');
+      }
+    });
+    try {
+      return await f;
+    } finally {
+      timer.cancel();
+      if (mounted && _waking != null) setState(() => _waking = null);
+    }
+  }
+
   Future<void> _join(Uri uri) async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final client = HomeGameClient(await SocketChannel.connect(uri), name: _playerName);
+      final viaRelay = uri.path.startsWith('/join/');
+      final connecting = SocketChannel.connect(uri, timeout: viaRelay ? relayWakeTimeout : const Duration(seconds: 8));
+      final client = HomeGameClient(await (viaRelay ? _wakeNotice(connecting) : connecting), name: _playerName);
       await client.join();
       client.addListener(_changed);
       setState(() {
@@ -178,7 +198,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
     } catch (_) {
       setState(() {
         _busy = false;
-        _error = 'Couldn\'t reach a Felt table at ${uri.host}:${uri.port}.';
+        _error = uri.path.startsWith('/join/')
+            ? 'Couldn\'t reach the invite-code server at ${uri.host}.'
+            : 'Couldn\'t reach a Felt table at ${uri.host}:${uri.port}.';
       });
     }
   }
@@ -254,6 +276,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
         ),
         const SizedBox(height: Space.l),
         if (_hosting) _hostForm(p) else _joinForm(p),
+        if (_waking != null) ...[
+          const SizedBox(height: Space.m),
+          Text(_waking!, style: Typo.callout(p.secondaryLabel)),
+        ],
         if (_error != null) ...[
           const SizedBox(height: Space.m),
           Text(_error!, style: Typo.callout(p.destructive)),

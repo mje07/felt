@@ -14,7 +14,7 @@ Play cash games, Sit & Gos and multi-table tournaments against adaptive AI oppon
 | `lib/screens/` | Lobby, table, settings and history panels. |
 | `lib/net/` | Home games: the protocol, host, client, LAN discovery and the relay link. |
 | `lib/learn/` | Lesson content for the learning path. |
-| `server/relay/` | The invite-code relay server (standalone Dart, with a Dockerfile and Fly.io config). |
+| `server/relay/` | The invite-code relay server (standalone Dart, with a Dockerfile; `render.yaml` deploys it free on Render). |
 | `test_screenshots/` | Renders the real UI to PNG for visual review. |
 | `tool/gen_sounds.dart` | Synthesizes the sound effects in `assets/sounds/` (procedural, so there are no sample licences). |
 
@@ -65,7 +65,7 @@ One player hosts. Their Felt deals and runs the game with the real engine, and f
 - **Games:** cash (free rebuys) or a Sit & Go, with bots in empty seats if you like (a Sit & Go always fills them), and a 15–60 second action timer (check if possible, otherwise fold). If a friend drops, they can reconnect to the same seat.
 - **Play chips only:** home games never touch your bankroll.
 
-**Invite codes** go through a small relay in `server/relay/` that you deploy yourself (Fly.io's free allowance is enough; see its README). The relay only forwards messages and stores nothing, but it does carry the traffic, so use one you run or trust.
+**Invite codes** go through a small relay in `server/relay/` that you deploy yourself, free and 24/7 on Render with the included `render.yaml` (see [its README](server/relay/README.md)). The relay only forwards messages and stores nothing, but it does carry the traffic, so use one you run or trust.
 
 ## Statistics
 

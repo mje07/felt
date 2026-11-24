@@ -1,4 +1,5 @@
-# Fly.io config for the Felt relay. Change `app` to a name of your own,
+# Fly.io config for the Felt relay (a paid host; Render is free, see README).
+# Change `app` to a name of your own,
 # then run `fly launch --copy-config` and `fly deploy` from this folder.
 app = "felt-relay"
 primary_region = "iad"

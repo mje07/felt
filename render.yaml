@@ -1,0 +1,16 @@
+# Render Blueprint for Felt's invite-code relay (server/relay).
+# Render dashboard → New → Blueprint → pick this repository → Apply.
+services:
+  - type: web
+    name: felt-relay
+    runtime: docker
+    plan: free
+    rootDir: server/relay
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    # Only rebuild when the relay itself changes, not on every app commit.
+    buildFilter:
+      paths:
+        - server/relay/**

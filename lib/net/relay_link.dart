@@ -17,6 +17,10 @@ Uri? relayBase(String text) {
   return u.replace(scheme: scheme, path: '', query: null, fragment: null);
 }
 
+/// How long to wait for the relay. Free hosts put idle servers to sleep, and
+/// waking one can take most of a minute.
+const relayWakeTimeout = Duration(seconds: 90);
+
 /// Invite codes are six characters (no look-alikes like 0/O or 1/I).
 const inviteCodeLength = 6;
 
@@ -39,7 +43,7 @@ class RelayHostLink {
   /// Completes when the relay connection drops.
   Future<void> get closed => _closed.future;
 
-  static Future<RelayHostLink> connect(Uri base, {Duration timeout = const Duration(seconds: 10)}) async {
+  static Future<RelayHostLink> connect(Uri base, {Duration timeout = relayWakeTimeout}) async {
     final ws = await WebSocket.connect(base.replace(path: '/host').toString()).timeout(timeout);
     final link = RelayHostLink._(ws);
     final gotCode = Completer<void>();
