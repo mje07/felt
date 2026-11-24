@@ -10,6 +10,7 @@ import '../app/sounds.dart';
 import '../app/theme.dart';
 import '../widgets/common.dart';
 import '../widgets/playing_card.dart';
+import 'spot_trainer_screen.dart';
 
 IconData drillIcon(DrillKind k) => switch (k) {
       DrillKind.preflop => CupertinoIcons.square_grid_3x2_fill,
@@ -114,6 +115,8 @@ class _Picker extends StatelessWidget {
                       Text('Short drills, ten questions each. Answer with the mouse or keys 1–5.',
                           style: Typo.body(p.secondaryLabel)),
                       const SizedBox(height: Space.xl),
+                      const _SpotTrainerCard(),
+                      const SizedBox(height: Space.l),
                       _DrillCard(kind: rec, recommended: why, onTap: () => onStart(rec)),
                       const SizedBox(height: Space.l),
                       LayoutBuilder(builder: (context, c) {
@@ -589,6 +592,42 @@ class _Scene extends StatelessWidget {
             if (q.board.isNotEmpty) group('BOARD', q.board, 52),
             if (q.villain != null) group('OPPONENT', q.villain!, 52),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Entry to the solver-backed spot trainer.
+class _SpotTrainerCard extends StatelessWidget {
+  const _SpotTrainerCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(CupertinoPageRoute<void>(builder: (_) => const SpotTrainerScreen())),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.all(Space.l),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Radii.l),
+            gradient: RadialGradient(colors: [p.feltCenter, p.feltEdge], radius: 2.2, center: Alignment.topLeft),
+          ),
+          child: Row(children: [
+            const Icon(CupertinoIcons.scope, size: 30, color: Color(0xFFFFFFFF)),
+            const SizedBox(width: Space.l),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Spot Trainer', style: Typo.title(const Color(0xFFFFFFFF))),
+                const SizedBox(height: 2),
+                Text('Play whole hands against the solver, graded by the EV every decision gives up.',
+                    style: Typo.callout(const Color(0xD9FFFFFF))),
+              ]),
+            ),
+            const Icon(CupertinoIcons.chevron_right, color: Color(0xB3FFFFFF)),
+          ]),
         ),
       ),
     );

@@ -18,8 +18,10 @@ import 'package:felt/screens/range_screen.dart';
 import 'package:felt/screens/equity_lab_screen.dart';
 import 'package:felt/screens/settings_panel.dart';
 import 'package:felt/screens/study_screen.dart';
+import 'package:felt/screens/spot_trainer_screen.dart';
 import 'package:felt/screens/stats_screen.dart';
 import 'package:felt/screens/training_screen.dart';
+import 'package:felt/widgets/common.dart' show PillButton;
 import 'package:felt/widgets/review_panel.dart';
 import 'package:felt/screens/table_screen.dart';
 import 'package:felt/widgets/charts.dart';
@@ -74,6 +76,7 @@ void main() {
   coachShots();
   suiteShots();
   studyShots();
+  trainerShots();
   settingsShots();
   historyShots();
   sngShots();
@@ -512,6 +515,40 @@ void studyShots() {
         await tester.pump();
       }
       await _snap(tester, 'study_$mode');
+    });
+  }
+}
+
+void trainerShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+
+    testWidgets('trainer $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1000);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(_themed(dark, SpotTrainerScreen(random: Random(11))));
+      await tester.tap(find.textContaining('Start ·'));
+      Future<void> wait() async {
+        for (var i = 0; i < 6; i++) {
+          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 250)));
+          await tester.pump(const Duration(milliseconds: 500));
+        }
+      }
+
+      // Act until a graded decision is on screen with another decision to make.
+      for (var guard = 0; guard < 12; guard++) {
+        await wait();
+        final actions = find.descendant(of: find.byType(Wrap), matching: find.byType(PillButton));
+        if (find.text('Next hand').evaluate().isNotEmpty) {
+          await tester.tap(find.text('Next hand'));
+          continue;
+        }
+        if (actions.evaluate().isEmpty) continue;
+        if (find.byType(HandReviewList).evaluate().isNotEmpty) break;
+        await tester.tap(actions.last);
+      }
+      await wait();
+      await _snap(tester, 'trainer_$mode');
     });
   }
 }

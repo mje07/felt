@@ -89,6 +89,15 @@ class SolverWorker {
     return (reply! as (int, SolverNodeView)).$2;
   }
 
+
+  /// For [combo] at the decision at [path]: each action's EV (chips) and the
+  /// solver's frequency with that hand. Null if the hand can't be there.
+  Future<(List<double>, List<double>)?> actionEvs(List<int> path, int combo) async {
+    final id = _nextId++;
+    _send.send(('evs', id, path, combo));
+    final reply = await _replies.firstWhere((m) => m is (String, int, Object?) && m.$1 == 'evs' && m.$2 == id);
+    return (reply! as (String, int, (List<double>, List<double>)?)).$3;
+  }
   void dispose() => _isolate.kill(priority: Isolate.immediate);
 
   // ------------------------------------------------------------ isolate side
@@ -102,6 +111,9 @@ class SolverWorker {
       switch (msg) {
         case ('stop',):
           stopRequested = true;
+        case ('evs', final int id, final List<int> path, final int combo):
+          final s = solver;
+          out.send(('evs', id, s?.actionEvs(path, combo)));
         case ('view', final int id, final List<int> path):
           final s = solver;
           if (s != null) out.send((id, s.view(path)));

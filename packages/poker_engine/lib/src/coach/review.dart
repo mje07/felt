@@ -429,19 +429,7 @@ DecisionReview _gradeSolver(DecisionAnalysis a, PlayerAction taken) {
   final frac = loss / max(1, a.pot);
   final freq = s.freq[i];
 
-  // Mixed strategies: anything the solver plays regularly is sound.
-  Grade grade;
-  if (freq >= 0.5 || lossBb < 0.1) {
-    grade = Grade.best;
-  } else if (freq >= 0.1 || frac <= 0.03) {
-    grade = Grade.good;
-  } else if (frac <= 0.1) {
-    grade = Grade.inaccuracy;
-  } else if (frac <= 0.3) {
-    grade = Grade.mistake;
-  } else {
-    grade = Grade.blunder;
-  }
+  final grade = gradeForMix(freq: freq, lossBb: lossBb, lossFrac: frac);
 
   final bestKind = s.actions[b].kind, takenAggressive = s.actions[i].aggressive;
   final bestAggressive = s.actions[b].aggressive;
@@ -477,4 +465,15 @@ DecisionReview _gradeSolver(DecisionAnalysis a, PlayerAction taken) {
     requiredEquity: a.requiredEquity,
     solverMix: s.mix,
   );
+}
+
+/// Grade for an action the solver takes with frequency [freq] that loses
+/// [lossBb] big blinds ([lossFrac] of the pot) against its best action.
+/// Mixed strategies: anything the solver plays regularly is sound.
+Grade gradeForMix({required double freq, required double lossBb, required double lossFrac}) {
+  if (freq >= 0.5 || lossBb < 0.1) return Grade.best;
+  if (freq >= 0.1 || lossFrac <= 0.03) return Grade.good;
+  if (lossFrac <= 0.1) return Grade.inaccuracy;
+  if (lossFrac <= 0.3) return Grade.mistake;
+  return Grade.blunder;
 }
