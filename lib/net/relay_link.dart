@@ -17,6 +17,13 @@ Uri? relayBase(String text) {
   return u.replace(scheme: scheme, path: '', query: null, fragment: null);
 }
 
+/// The relay Felt uses when the player hasn't set their own.
+const defaultRelayHost = 'felt-relay.onrender.com';
+
+/// The relay for the "Invite-code server" setting: the player's own address,
+/// or [defaultRelayHost] when it's empty. Null if what they typed isn't valid.
+Uri? relayFor(String setting) => relayBase(setting.trim().isEmpty ? defaultRelayHost : setting);
+
 /// How long to wait for the relay. Free hosts put idle servers to sleep, and
 /// waking one can take most of a minute.
 const relayWakeTimeout = Duration(seconds: 90);

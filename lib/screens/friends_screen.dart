@@ -131,7 +131,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       }
     }
     _relayError = null;
-    final relay = relayBase(relayUrl);
+    final relay = relayFor(relayUrl);
     if (relay != null) {
       try {
         await _wakeNotice(host.openRelay(relay));
@@ -382,10 +382,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
       ]),
       const SizedBox(height: Space.l),
       SettingsCard(title: 'Invite code', icon: CupertinoIcons.globe, children: [
-        if (relayBase(SettingsScope.of(context).relayUrl) == null)
+        if (relayFor(SettingsScope.of(context).relayUrl) == null)
           const SettingRow(
             label: 'Invite codes are off',
-            detail: 'Set an invite-code server below to join friends anywhere with a 6-letter code.',
+            detail: 'The invite-code server address below isn\'t valid. Clear it to use Felt\'s own server.',
           )
         else
           SettingRow(
@@ -405,7 +405,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 height: 32,
                 onPressed: _busy || _code.text.trim().length != inviteCodeLength
                     ? null
-                    : () => _join(relayJoinUri(relayBase(SettingsScope.of(context).relayUrl)!, _code.text)),
+                    : () => _join(relayJoinUri(relayFor(SettingsScope.of(context).relayUrl)!, _code.text)),
               ),
             ),
           ),
@@ -442,11 +442,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
         children: [
           SettingRow(
             label: 'Server address',
-            detail: 'For games over the internet. Felt includes a small relay you can deploy for free (see the '
-                'README); everyone at the table uses the same address. Leave empty to play on your network only.',
+            detail: 'Invite codes go through Felt\'s own server. To use one you run instead (see the README), '
+                'enter its address; everyone at the table needs the same one. Leave empty for Felt\'s server.',
             trailing: FeltTextField(
               controller: _relay,
-              placeholder: 'felt-relay.fly.dev',
+              placeholder: defaultRelayHost,
               width: 220,
               onChanged: (v) {
                 final s = SettingsScope.of(context);

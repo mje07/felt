@@ -15,6 +15,10 @@ void main() {
     expect(relayBase('ws://localhost:8080').toString(), 'ws://localhost:8080');
     expect(relayBase(''), isNull);
     expect(relayBase('ftp://x.com'), isNull);
+    expect(relayFor('').toString(), 'wss://felt-relay.onrender.com');
+    expect(relayFor('  ').toString(), 'wss://felt-relay.onrender.com');
+    expect(relayFor('ws://localhost:8080').toString(), 'ws://localhost:8080');
+    expect(relayFor('ftp://x.com'), isNull);
     expect(relayJoinUri(Uri.parse('wss://r.dev'), ' k7qh2m ').toString(), 'wss://r.dev/join/K7QH2M');
   });
 

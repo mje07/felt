@@ -59,13 +59,13 @@ Fields of 18 to 180 players at 9-handed tables, from a free daily freeroll to Th
 ## Play with friends
 
 One player hosts. Their Felt deals and runs the game with the real engine, and friends play from their own PCs.
-- **Joining:** games on the same network appear in "Join a game" (UDP broadcast on port 47111). Anyone can join by address and port (TCP 47110), for example over port forwarding or a VPN such as Tailscale. With an invite-code server set, friends anywhere can join with a 6-letter code.
+- **Joining:** games on the same network appear in "Join a game" (UDP broadcast on port 47111). Anyone can join by address and port (TCP 47110), for example over port forwarding or a VPN such as Tailscale. Friends anywhere can join with a 6-letter invite code.
 - **Fair by design:** each player is only ever sent their own hole cards, and other hands only when they're shown down. Friends send intended actions, which the host checks with the rules engine.
 - **Coach included:** each friend's Felt rebuilds the hand from the host's messages, so their coach grades their own decisions and the hands are saved to their own history.
 - **Games:** cash (free rebuys) or a Sit & Go, with bots in empty seats if you like (a Sit & Go always fills them), and a 15–60 second action timer (check if possible, otherwise fold). If a friend drops, they can reconnect to the same seat.
 - **Play chips only:** home games never touch your bankroll.
 
-**Invite codes** go through a small relay in `server/relay/` that you deploy yourself, free and 24/7 on Render with the included `render.yaml` (see [its README](server/relay/README.md)). The relay only forwards messages and stores nothing, but it does carry the traffic, so use one you run or trust.
+**Invite codes** go through a small relay in `server/relay/`. Felt uses one at `felt-relay.onrender.com` by default; to run your own (free and 24/7 on Render with the included `render.yaml`, see [its README](server/relay/README.md)), put its address in Play with friends → Invite-code server. The relay only forwards messages and stores nothing, but it does carry the traffic, hole cards included, so use one you trust.
 
 ## Statistics
 
