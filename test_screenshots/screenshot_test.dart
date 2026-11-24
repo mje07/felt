@@ -79,6 +79,7 @@ void main() {
   studyShots();
   trainerShots();
   importShots();
+  mttShots();
   settingsShots();
   historyShots();
   sngShots();
@@ -578,6 +579,73 @@ void importShots() {
       await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 3)));
       await tester.pumpAndSettle();
       await _snap(tester, 'replayer_$mode');
+    });
+  }
+}
+
+void mttShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+    testWidgets('mtt lobby $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1300);
+      tester.view.devicePixelRatio = 1;
+      Bankroll.current = Bankroll.memory(40000);
+      final settings = Settings.memory()..appearance = dark ? Appearance.dark : Appearance.light;
+      await tester.pumpWidget(RepaintBoundary(
+          key: const ValueKey('shot'), child: FeltApp(settings: settings, history: HistoryStore.memory())));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tournament'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sunday Million'));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'mtt_lobby_$mode');
+    });
+
+    testWidgets('mtt table $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      Bankroll.current = Bankroll.memory(100000);
+      TournamentStore.current = TournamentStore.memory();
+      GameController? c;
+      await tester.pumpWidget(_themed(
+        dark,
+        TableScreen(
+          config: const TableConfig(
+            mode: GameMode.mtt,
+            mttField: 180,
+            mttBuyIn: 5000,
+            mttGuarantee: 1000000,
+            eventName: 'Sunday Million',
+            speed: BlindSpeed.hyper,
+            startingStack: StartingStack.standard,
+            difficulty: Difficulty.casual,
+          ),
+          history: HistoryStore.memory(),
+          useIsolates: false,
+          onController: (x) => c = x,
+        ),
+      ));
+      // Fold until the field has thinned, then take the picture on our turn.
+      for (var i = 0; i < 40000; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        final ctl = c;
+        if (ctl == null) continue;
+        if (ctl.mtt!.playersLeft <= 120 && ctl.heroLegal != null) break;
+        if (ctl.heroLegal != null) {
+          ctl.act(ctl.heroLegal!.canCheck ? const PlayerAction.check() : const PlayerAction.fold());
+        }
+        if (ctl.handOver) ctl.dealNext();
+        if (ctl.outcome != null) break;
+      }
+      await tester.pump(const Duration(milliseconds: 600));
+      await _snap(tester, 'mtt_table_$mode');
+      await tester.tap(find.byIcon(CupertinoIcons.list_number));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'mtt_field_$mode');
+      await tester.tap(find.byIcon(CupertinoIcons.xmark).last);
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 10));
     });
   }
 }

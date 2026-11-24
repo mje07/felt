@@ -76,7 +76,7 @@ class HandHistory {
 
   /// Tournament blind level (1-based), if [mode] is 'sng'.
   final int? level;
-  bool get isTournament => mode == 'sng';
+  bool get isTournament => mode != 'cash';
 
   /// Where an imported hand came from ('PokerStars', 'GGPoker'); null for
   /// hands played in Felt. [sourceId] is the site's hand number.

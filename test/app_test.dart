@@ -328,4 +328,66 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 10));
   });
+
+  testWidgets('an 18-player multi-table tournament plays to the end', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final bankroll = Bankroll.memory(10000);
+    final results = TournamentStore.memory();
+    Bankroll.current = bankroll;
+    TournamentStore.current = results;
+    GameController? c;
+    await tester.pumpWidget(_host(
+      Settings.memory()..speed = GameSpeed.quick,
+      TableScreen(
+        config: const TableConfig(
+          mode: GameMode.mtt,
+          mttField: 18,
+          mttBuyIn: 200,
+          eventName: 'Test Cup',
+          speed: BlindSpeed.hyper,
+          startingStack: StartingStack.short,
+          difficulty: Difficulty.casual,
+        ),
+        history: HistoryStore.memory(),
+        useIsolates: false,
+        onController: (x) => c = x,
+      ),
+    ));
+    await tester.pump();
+    expect(bankroll.balance, 9800, reason: 'buy-in taken');
+    expect(find.textContaining('Test Cup · Level 1'), findsOneWidget);
+    expect(find.textContaining('18 of 18 left'), findsOneWidget);
+    final m = c!.mtt!;
+    expect(m.tables.length, 2);
+
+    var sawMove = false;
+    for (var i = 0; i < 40000 && c?.outcome == null; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      // Seat 0 is always us, whichever table we're at.
+      expect(c!.view.seats[0].isHuman, isTrue);
+      if ((c!.view.headline ?? '').contains('Final table') || (c!.view.headline ?? '').contains('New table')) sawMove = true;
+      for (final label in ['Call', 'Call All-in', 'Check', 'Deal Next Hand']) {
+        final f = find.descendant(of: find.byType(ActionBar), matching: find.text(label));
+        if (f.evaluate().isNotEmpty) {
+          await tester.tap(f.first, warnIfMissed: false);
+          break;
+        }
+      }
+    }
+    final o = c!.outcome!;
+    expect(m.isFinished, isTrue);
+    expect(m.places.values.toSet().length, 18);
+    expect(o.prize, m.prizeFor(0));
+    expect(bankroll.balance, 9800 + o.prize);
+    expect(results.results.single.isMtt, isTrue);
+    expect(results.results.single.eventName, 'Test Cup');
+    expect(sawMove || o.place > 9, isTrue, reason: 'reaching the final table moves everyone to one table');
+    await tester.pump();
+    expect(find.textContaining(o.won ? 'You won the Test Cup!' : 'You finished ${ordinal(o.place)} of 18'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 10));
+  }, timeout: const Timeout(Duration(minutes: 5)));
 }

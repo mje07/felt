@@ -3,6 +3,7 @@ import 'package:poker_engine/poker_engine.dart';
 
 import '../app/bankroll.dart';
 import '../app/controller.dart';
+import '../app/events.dart';
 import '../app/history_store.dart';
 import '../app/settings.dart';
 import '../app/theme.dart';
@@ -21,7 +22,7 @@ import 'training_screen.dart';
 import 'table_screen.dart';
 
 const _stakes = [(1, 2), (5, 10), (25, 50), (100, 200)];
-const _sngBuyIns = [100, 500, 2500, 10000];
+const _sngBuyIns = sngBuyIns;
 
 const _styleBlurb = {
   'mixed': 'A table of different styles: the most realistic game.',
@@ -53,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _style = 'mixed';
   Difficulty _difficulty = Difficulty.standard;
   GameMode _mode = GameMode.cash;
+  int _event = 1;
   int _sngBuyIn = 1;
   BlindSpeed _speed = BlindSpeed.turbo;
   StartingStack _startStack = StartingStack.standard;
@@ -88,9 +90,13 @@ class _HomeScreenState extends State<HomeScreen> {
       style: _style,
       difficulty: _difficulty,
       sngBuyIn: _sngBuyIns[_sngBuyIn],
-      speed: _speed,
-      startingStack: _startStack,
+      speed: _mode == GameMode.mtt ? tournamentEvents[_event].speed : _speed,
+      startingStack: _mode == GameMode.mtt ? tournamentEvents[_event].stack : _startStack,
       payoutStyle: _payouts,
+      mttField: tournamentEvents[_event].field,
+      mttBuyIn: tournamentEvents[_event].buyIn,
+      mttGuarantee: tournamentEvents[_event].guarantee,
+      eventName: tournamentEvents[_event].name,
     );
   }
 
@@ -111,7 +117,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final config = _config;
         final cost = config.entryCost;
         final affordable = bankroll.canAfford(cost);
-        final tournament = _mode == GameMode.sitAndGo;
+        final tournament = _mode != GameMode.cash;
+        final sng = _mode == GameMode.sitAndGo, isMtt = _mode == GameMode.mtt;
         final prizes = prizesFor(_payouts, _seats, _sngBuyIns[_sngBuyIn]);
         return CupertinoPageScaffold(
           backgroundColor: p.background,
@@ -120,30 +127,40 @@ class _HomeScreenState extends State<HomeScreen> {
               Positioned(
                 top: Space.l,
                 right: Space.l,
-                child: Row(children: [
-                  IconPill(
-                    icon: CupertinoIcons.chart_bar_alt_fill,
-                    tooltip: 'Statistics',
-                    onPressed: () => Navigator.of(context)
-                        .push(CupertinoPageRoute<void>(builder: (_) => StatsScreen(history: widget.history)))
-                        .then((_) => setState(() {})),
-                  ),
-                  const SizedBox(width: Space.s),
-                  IconPill(
-                    icon: CupertinoIcons.clock,
-                    tooltip: 'Hand history',
-                    onPressed: () => showPanel(context,
-                        title: 'History', width: 560, builder: (_) => HistoryPanel(store: widget.history)),
-                  ),
-                  const SizedBox(width: Space.s),
-                  IconPill(
-                    icon: CupertinoIcons.gear_alt,
-                    tooltip: 'Settings',
-                    onPressed: () => showPanel(context,
-                            title: 'Settings', width: 540, builder: (_) => SettingsPanel(history: widget.history))
-                        .then((_) => setState(() {})),
-                  ),
-                ]),
+                child: Row(
+                  children: [
+                    IconPill(
+                      icon: CupertinoIcons.chart_bar_alt_fill,
+                      tooltip: 'Statistics',
+                      onPressed: () =>
+                          Navigator.of(context)
+                              .push(CupertinoPageRoute<void>(builder: (_) => StatsScreen(history: widget.history)))
+                              .then((_) => setState(() {})),
+                    ),
+                    const SizedBox(width: Space.s),
+                    IconPill(
+                      icon: CupertinoIcons.clock,
+                      tooltip: 'Hand history',
+                      onPressed: () => showPanel(
+                        context,
+                        title: 'History',
+                        width: 560,
+                        builder: (_) => HistoryPanel(store: widget.history),
+                      ),
+                    ),
+                    const SizedBox(width: Space.s),
+                    IconPill(
+                      icon: CupertinoIcons.gear_alt,
+                      tooltip: 'Settings',
+                      onPressed: () => showPanel(
+                        context,
+                        title: 'Settings',
+                        width: 540,
+                        builder: (_) => SettingsPanel(history: widget.history),
+                      ).then((_) => setState(() {})),
+                    ),
+                  ],
+                ),
               ),
               Center(
                 child: SingleChildScrollView(
@@ -168,22 +185,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             ChoiceChips<GameMode>(
                               value: _mode,
-                              options: const {GameMode.cash: 'Cash game', GameMode.sitAndGo: 'Sit & Go'},
+                              options: const {
+                                GameMode.cash: 'Cash game',
+                                GameMode.sitAndGo: 'Sit & Go',
+                                GameMode.mtt: 'Tournament',
+                              },
                               onChanged: (v) => setState(() => _mode = v),
                             ),
                             SettingRow(
                               label: 'Your name',
                               trailing: FeltTextField(controller: _name, placeholder: 'You', maxLength: 16),
                             ),
-                            SettingRow(
-                              label: 'Players',
-                              detail: _seats == 2 ? 'Heads-up against one opponent' : 'You and ${_seats - 1} opponents',
-                              trailing: ChoiceChips<int>(
-                                value: _seats,
-                                options: {for (var n = 2; n <= 9; n++) n: '$n'},
-                                onChanged: (v) => setState(() => _seats = v),
+                            if (!isMtt)
+                              SettingRow(
+                                label: 'Players',
+                                detail: _seats == 2
+                                    ? 'Heads-up against one opponent'
+                                    : 'You and ${_seats - 1} opponents',
+                                trailing: ChoiceChips<int>(
+                                  value: _seats,
+                                  options: {for (var n = 2; n <= 9; n++) n: '$n'},
+                                  onChanged: (v) => setState(() => _seats = v),
+                                ),
                               ),
-                            ),
                             if (!tournament)
                               SettingRow(
                                 label: 'Stakes',
@@ -191,12 +215,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                 trailing: ChoiceChips<int>(
                                   value: _stake,
                                   options: {
-                                    for (var i = 0; i < _stakes.length; i++) i: '${_stakes[i].$1}/${_stakes[i].$2}'
+                                    for (var i = 0; i < _stakes.length; i++) i: '${_stakes[i].$1}/${_stakes[i].$2}',
                                   },
                                   onChanged: (v) => setState(() => _stake = v),
                                 ),
                               )
-                            else ...[
+                            else if (isMtt) ...[
+                              SettingRow(
+                                label: 'Event',
+                                detail: _eventDetail(tournamentEvents[_event]),
+                                below: Column(
+                                  children: [
+                                    for (final (i, e) in tournamentEvents.indexed)
+                                      _EventTile(
+                                        event: e,
+                                        selected: i == _event,
+                                        affordable: bankroll.canAfford(e.buyIn),
+                                        onTap: () => setState(() => _event = i),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ] else if (sng) ...[
                               SettingRow(
                                 label: 'Buy-in',
                                 detail: 'Prize pool ${formatChips(_sngBuyIns[_sngBuyIn] * _seats)}',
@@ -209,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               SettingRow(
                                 label: 'Payouts',
                                 detail: [
-                                  for (final (i, prize) in prizes.indexed) '${ordinal(i + 1)} ${formatChips(prize)}'
+                                  for (final (i, prize) in prizes.indexed) '${ordinal(i + 1)} ${formatChips(prize)}',
                                 ].join(' · '),
                                 trailing: ChoiceChips<PayoutStyle>(
                                   value: _payouts,
@@ -241,7 +281,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               detail: _styleBlurb[_style],
                               below: ChoiceChips<String>(
                                 value: _style,
-                                options: {'mixed': 'Mixed', 'random': 'Random', for (final s in Personality.all) s.id: s.label},
+                                options: {
+                                  'mixed': 'Mixed',
+                                  'random': 'Random',
+                                  for (final s in Personality.all) s.id: s.label,
+                                },
                                 onChanged: (v) => setState(() => _style = v),
                               ),
                             ),
@@ -263,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: Space.xl),
                         PillButton(
                           label: tournament ? 'Register' : 'Sit Down',
-                          sublabel: '${formatChips(cost)} from your bankroll',
+                          sublabel: cost == 0 ? 'Free to enter' : '${formatChips(cost)} from your bankroll',
                           style: PillStyle.filled,
                           minWidth: 260,
                           height: 56,
@@ -271,40 +315,50 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         if (!affordable) ...[
                           const SizedBox(height: Space.s),
-                          Text('Not enough chips in your bankroll for this table.',
-                              style: Typo.callout(p.destructive)),
+                          Text(
+                            tournament
+                                ? 'Bankroll needed: ${formatChips(cost)}. You have ${formatChips(bankroll.balance)}.'
+                                : 'Not enough chips in your bankroll for this table.',
+                            style: Typo.callout(p.destructive),
+                          ),
                         ],
                         const SizedBox(height: Space.m),
-                        Wrap(alignment: WrapAlignment.center, children: [
-                          PillButton(
-                            label: 'Training',
-                            style: PillStyle.plain,
-                            minWidth: 0,
-                            onPressed: () => Navigator.of(context).push(
-                                CupertinoPageRoute<void>(builder: (_) => TrainingScreen(history: widget.history))),
-                          ),
-                          PillButton(
-                            label: 'Range Charts',
-                            style: PillStyle.plain,
-                            minWidth: 0,
-                            onPressed: () => Navigator.of(context)
-                                .push(CupertinoPageRoute<void>(builder: (_) => RangeScreen(history: widget.history))),
-                          ),
-                          PillButton(
-                            label: 'Equity Lab',
-                            style: PillStyle.plain,
-                            minWidth: 0,
-                            onPressed: () => Navigator.of(context)
-                                .push(CupertinoPageRoute<void>(builder: (_) => const EquityLabScreen())),
-                          ),
-                          PillButton(
-                            label: 'Study',
-                            style: PillStyle.plain,
-                            minWidth: 0,
-                            onPressed: () => Navigator.of(context)
-                                .push(CupertinoPageRoute<void>(builder: (_) => const StudyScreen())),
-                          ),
-                        ]),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          children: [
+                            PillButton(
+                              label: 'Training',
+                              style: PillStyle.plain,
+                              minWidth: 0,
+                              onPressed: () => Navigator.of(
+                                context,
+                              ).push(CupertinoPageRoute<void>(builder: (_) => TrainingScreen(history: widget.history))),
+                            ),
+                            PillButton(
+                              label: 'Range Charts',
+                              style: PillStyle.plain,
+                              minWidth: 0,
+                              onPressed: () => Navigator.of(context)
+                                  .push(CupertinoPageRoute<void>(builder: (_) => RangeScreen(history: widget.history))),
+                            ),
+                            PillButton(
+                              label: 'Equity Lab',
+                              style: PillStyle.plain,
+                              minWidth: 0,
+                              onPressed: () =>
+                                  Navigator.of(context)
+                                      .push(CupertinoPageRoute<void>(builder: (_) => const EquityLabScreen())),
+                            ),
+                            PillButton(
+                              label: 'Study',
+                              style: PillStyle.plain,
+                              minWidth: 0,
+                              onPressed: () =>
+                                  Navigator.of(context)
+                                      .push(CupertinoPageRoute<void>(builder: (_) => const StudyScreen())),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -326,22 +380,25 @@ class _BankrollLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     final low = bankroll.balance < 1000;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      const ChipDisc(amount: 1000, size: 16),
-      const SizedBox(width: 6),
-      Text('Bankroll ', style: Typo.callout(p.secondaryLabel)),
-      AnimatedCount(value: bankroll.balance, style: Typo.number(p.label, size: 14)),
-      if (low) ...[
-        const SizedBox(width: Space.s),
-        PillButton(
-          label: 'Top up to ${formatChips(Bankroll.startingBalance)}',
-          style: PillStyle.plain,
-          minWidth: 0,
-          height: 30,
-          onPressed: bankroll.topUp,
-        ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const ChipDisc(amount: 1000, size: 16),
+        const SizedBox(width: 6),
+        Text('Bankroll ', style: Typo.callout(p.secondaryLabel)),
+        AnimatedCount(value: bankroll.balance, style: Typo.number(p.label, size: 14)),
+        if (low) ...[
+          const SizedBox(width: Space.s),
+          PillButton(
+            label: 'Top up to ${formatChips(Bankroll.startingBalance)}',
+            style: PillStyle.plain,
+            minWidth: 0,
+            height: 30,
+            onPressed: bankroll.topUp,
+          ),
+        ],
       ],
-    ]);
+    );
   }
 }
 
@@ -368,7 +425,10 @@ class _HeroCards extends StatelessWidget {
             offset: const Offset(26, 4),
             child: Transform.rotate(
               angle: 0.18,
-              child: DealIn(from: const Offset(0.3, -0.4), child: PlayingCard(card: parseCard('Kh'), width: 80)),
+              child: DealIn(
+                from: const Offset(0.3, -0.4),
+                child: PlayingCard(card: parseCard('Kh'), width: 80),
+              ),
             ),
           ),
         ],
@@ -393,38 +453,104 @@ class _UpdateBanner extends StatelessWidget {
         final (String text, Widget? action) = switch (u.status) {
           UpdateStatus.downloading => ('Downloading Felt $v… ${(u.progress * 100).round()}%', null),
           UpdateStatus.ready => (
-              'Felt $v is ready',
-              PillButton(
-                label: 'Restart to update',
-                style: PillStyle.filled,
-                minWidth: 0,
-                height: 30,
-                onPressed: u.installNow,
-              ),
+            'Felt $v is ready',
+            PillButton(
+              label: 'Restart to update',
+              style: PillStyle.filled,
+              minWidth: 0,
+              height: 30,
+              onPressed: u.installNow,
             ),
+          ),
           UpdateStatus.available => (
-              'Felt $v is available',
-              PillButton(
-                label: 'Download',
-                style: PillStyle.plain,
-                minWidth: 0,
-                height: 30,
-                onPressed: () => openInBrowser(u.releasePageUrl),
-              ),
+            'Felt $v is available',
+            PillButton(
+              label: 'Download',
+              style: PillStyle.plain,
+              minWidth: 0,
+              height: 30,
+              onPressed: () => openInBrowser(u.releasePageUrl),
             ),
+          ),
           _ => ('', null),
         };
         if (text.isEmpty) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.only(top: Space.s),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(CupertinoIcons.arrow_down_circle_fill, size: 16, color: p.accent),
-            const SizedBox(width: 6),
-            Text(text, style: Typo.callout(p.secondaryLabel)),
-            if (action != null) ...[const SizedBox(width: Space.s), action],
-          ]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.arrow_down_circle_fill, size: 16, color: p.accent),
+              const SizedBox(width: 6),
+              Text(text, style: Typo.callout(p.secondaryLabel)),
+              if (action != null) ...[const SizedBox(width: Space.s), action],
+            ],
+          ),
         );
       },
+    );
+  }
+}
+
+String _eventDetail(TournamentEvent e) =>
+    '${e.field} players · ${e.speed.label.toLowerCase()} blinds · ${formatChips(e.stack.chips)} chips · '
+    '${e.paidPlaces} paid · 1st ${formatChips(e.firstPrize)}';
+
+/// One event in the tournament schedule.
+class _EventTile extends StatelessWidget {
+  const _EventTile({required this.event, required this.selected, required this.affordable, required this.onTap});
+  final TournamentEvent event;
+  final bool selected, affordable;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final e = event;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: GestureDetector(
+        onTap: onTap,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: AnimatedContainer(
+            duration: Motion.fast,
+            padding: const EdgeInsets.symmetric(horizontal: Space.m, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? p.accent.withValues(alpha: 0.12)
+                  : p.isDark
+                  ? const Color(0x0DFFFFFF)
+                  : const Color(0x08000000),
+              borderRadius: BorderRadius.circular(Radii.m),
+              border: Border.all(color: selected ? p.accent : const Color(0x00000000)),
+            ),
+            child: Opacity(
+              opacity: affordable ? 1 : 0.5,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(e.name, style: Typo.headline(selected ? p.accent : p.label)),
+                        Text(e.blurb, style: Typo.caption(p.secondaryLabel).copyWith(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(e.isFreeroll ? 'Free' : formatChips(e.buyIn), style: Typo.number(p.label, size: 14)),
+                      Text('Pool ${formatChips(e.prizePool)}', style: Typo.caption(p.secondaryLabel)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

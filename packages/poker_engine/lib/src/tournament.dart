@@ -286,6 +286,8 @@ class TournamentResult {
     required this.prize,
     required this.speed,
     required this.payoutStyle,
+    this.format = 'sng',
+    this.eventName,
   });
 
   factory TournamentResult.fromJson(Map<String, Object?> j) => TournamentResult(
@@ -296,12 +298,19 @@ class TournamentResult {
         prize: j['prize'] as int,
         speed: BlindSpeed.values.byName(j['speed'] as String),
         payoutStyle: PayoutStyle.values.byName(j['payouts'] as String),
+        format: (j['format'] as String?) ?? 'sng',
+        eventName: j['event'] as String?,
       );
 
   final DateTime at;
   final int players, buyIn, place, prize;
   final BlindSpeed speed;
   final PayoutStyle payoutStyle;
+
+  /// 'sng' (single table) or 'mtt' (multi-table), and the event's name.
+  final String format;
+  final String? eventName;
+  bool get isMtt => format == 'mtt';
 
   int get profit => prize - buyIn;
   bool get inTheMoney => prize > 0;
@@ -314,5 +323,7 @@ class TournamentResult {
         'prize': prize,
         'speed': speed.name,
         'payouts': payoutStyle.name,
+        if (format != 'sng') 'format': format,
+        if (eventName != null) 'event': eventName,
       };
 }

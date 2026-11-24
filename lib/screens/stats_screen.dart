@@ -123,7 +123,7 @@ class _StatsScreenState extends State<StatsScreen> {
                           child: Center(
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 1080),
-                              child: _TournamentsCard(results: TournamentStore.current.results),
+                              child: _TournamentSections(results: TournamentStore.current.results),
                             ),
                           ),
                         )
@@ -230,7 +230,7 @@ class _Body extends StatelessWidget {
           ),
           if (mode != StatsMode.cash && TournamentStore.current.results.isNotEmpty) ...[
             const SizedBox(height: Space.l),
-            _TournamentsCard(results: TournamentStore.current.results),
+            _TournamentSections(results: TournamentStore.current.results),
           ],
           if (mode == StatsMode.all && Bankroll.current.ledger.length >= 2) ...[
             const SizedBox(height: Space.l),
@@ -802,6 +802,85 @@ class _LeaksCard extends StatelessWidget {
             ]),
           ),
         ],
+      ]),
+    );
+  }
+}
+
+/// Sit & Go and multi-table tournament results, each in its own card.
+class _TournamentSections extends StatelessWidget {
+  const _TournamentSections({required this.results});
+  final List<TournamentResult> results;
+
+  @override
+  Widget build(BuildContext context) {
+    final sng = [for (final r in results) if (!r.isMtt) r];
+    final mtt = [for (final r in results) if (r.isMtt) r];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (mtt.isNotEmpty) _MttCard(results: mtt),
+      if (mtt.isNotEmpty && sng.isNotEmpty) const SizedBox(height: Space.l),
+      if (sng.isNotEmpty) _TournamentsCard(results: sng),
+    ]);
+  }
+}
+
+class _MttCard extends StatelessWidget {
+  const _MttCard({required this.results});
+  final List<TournamentResult> results;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final n = results.length;
+    final spent = results.fold(0, (a, r) => a + r.buyIn);
+    final won = results.fold(0, (a, r) => a + r.prize);
+    final profit = won - spent;
+    final roi = spent == 0 ? 0.0 : profit / spent;
+    final finalTables = results.where((r) => r.place <= 9).length;
+    final itm = results.where((r) => r.inTheMoney).length;
+    final best = results.reduce((a, b) => a.place / a.players <= b.place / b.players ? a : b);
+    final biggest = results.map((r) => r.prize).reduce(math.max);
+    final recent = results.reversed.take(5).toList();
+    String pct(double v) => '${(v * 100).round()}%';
+    Widget figure(String label, String value, {Color? color}) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: Typo.caption(p.secondaryLabel)),
+            const SizedBox(height: 2),
+            Text(value, style: Typo.number(color ?? p.label, size: 20)),
+          ]),
+        );
+    return _Card(
+      title: 'Tournament results',
+      subtitle: '$n multi-table tournament${n == 1 ? '' : 's'} played',
+      trailing: Text('${profit >= 0 ? '+' : '−'}${formatChips(profit.abs())}',
+          style: Typo.number(profit >= 0 ? p.positive : p.destructive, size: 17)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          figure('Final tables', '$finalTables'),
+          figure('In the money', pct(itm / n)),
+          figure('ROI', '${roi >= 0 ? '+' : '−'}${pct(roi.abs())}', color: roi >= 0 ? p.positive : p.destructive),
+          figure('Best finish', '${ordinal(best.place)} of ${best.players}'),
+          figure('Biggest cash', biggest == 0 ? '–' : formatChips(biggest)),
+        ]),
+        const SizedBox(height: Space.l),
+        Text('Recent', style: Typo.callout(p.secondaryLabel)),
+        for (final r in recent)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(children: [
+              Expanded(child: Text(r.eventName ?? 'Tournament', style: Typo.body(p.label))),
+              SizedBox(
+                width: 120,
+                child: Text('${ordinal(r.place)} of ${r.players}', style: Typo.number(p.secondaryLabel, size: 13)),
+              ),
+              SizedBox(
+                width: 110,
+                child: Text(r.prize > 0 ? '+${formatChips(r.prize)}' : '–',
+                    textAlign: TextAlign.right,
+                    style: Typo.number(r.prize > 0 ? p.positive : p.tertiaryLabel, size: 13)),
+              ),
+            ]),
+          ),
       ]),
     );
   }

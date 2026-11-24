@@ -127,21 +127,27 @@ class MultiTableTournament {
 
   TournamentInfo get info => TournamentInfo(prizes: prizes, playersLeft: playersLeft);
 
-  /// Starts the next hand at [table]. Seat indices in the hand match the
-  /// table's seats.
-  HandState startHandAt(MttTable table, {List<int>? deck}) {
+  /// Starts the next hand at [table]. Hand seat `i` is table seat
+  /// `(i + offset) % size`, so a human can always sit at hand seat 0.
+  HandState startHandAt(MttTable table, {int offset = 0, List<int>? deck}) {
+    final n = table.seats.length;
+    int toTable(int i) => (i + offset) % n;
+    int toHand(int pos) => pos < 0 ? pos : (pos - offset + n) % n;
     final alive = [for (final id in table.seats) id != null && isAlive(id)];
     table.rotation.advance(alive, rng);
     final level = currentLevel;
     table.handsPlayed++;
     return startHand(
       players: [
-        for (final id in table.seats)
-          id != null && isAlive(id) ? SeatSetup(players[id].name, players[id].stack) : null,
+        for (var i = 0; i < n; i++)
+          () {
+            final id = table.seats[toTable(i)];
+            return id != null && isAlive(id) ? SeatSetup(players[id].name, players[id].stack) : null;
+          }(),
       ],
-      button: table.rotation.buttonPos,
-      smallBlindSeat: table.rotation.smallBlindSeat,
-      bigBlindSeat: table.rotation.bigBlindPos,
+      button: toHand(table.rotation.buttonPos),
+      smallBlindSeat: toHand(table.rotation.smallBlindSeat),
+      bigBlindSeat: toHand(table.rotation.bigBlindPos),
       smallBlind: level.smallBlind,
       bigBlind: level.bigBlind,
       ante: level.ante,
@@ -151,14 +157,16 @@ class MultiTableTournament {
     );
   }
 
-  /// Copies stacks back after a hand at [table] and records busts (players
-  /// busting together are placed by their stack at the start of the hand).
-  /// Eliminations carry player ids, best place last.
-  List<Elimination> settle(MttTable table, HandState done) {
+  /// Copies stacks back after a hand at [table] (dealt with [offset], see
+  /// [startHandAt]) and records busts (players busting together are placed
+  /// by their stack at the start of the hand). Eliminations carry player
+  /// ids, best place last.
+  List<Elimination> settle(MttTable table, HandState done, {int offset = 0}) {
+    final n = table.seats.length;
     final start = done.log.whereType<HandStarted>().first;
     final busted = <int>[];
     for (final s in done.seats) {
-      final id = table.seats[s.index];
+      final id = table.seats[(s.index + offset) % n];
       if (!s.inHand || id == null) continue;
       players[id].stack = s.stack;
       if (s.stack == 0 && !places.containsKey(id)) busted.add(s.index);
@@ -168,7 +176,7 @@ class MultiTableTournament {
     var place = playersLeft + busted.length;
     final out = <Elimination>[];
     for (final seat in busted) {
-      final id = table.seats[seat]!;
+      final id = table.seats[(seat + offset) % n]!;
       places[id] = place;
       out.add(Elimination(id, place));
       place--;

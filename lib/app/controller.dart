@@ -12,7 +12,7 @@ import 'sounds.dart';
 import 'theme.dart';
 import 'tournament_store.dart';
 
-enum GameMode { cash, sitAndGo }
+enum GameMode { cash, sitAndGo, mtt }
 
 /// Lobby choices for a new table.
 class TableConfig {
@@ -28,6 +28,10 @@ class TableConfig {
     this.speed = BlindSpeed.turbo,
     this.startingStack = StartingStack.standard,
     this.payoutStyle = PayoutStyle.standard,
+    this.mttField = 45,
+    this.mttBuyIn = 1000,
+    this.mttGuarantee = 0,
+    this.eventName = 'Tournament',
   });
 
   final GameMode mode;
@@ -44,13 +48,18 @@ class TableConfig {
   final StartingStack startingStack;
   final PayoutStyle payoutStyle;
 
-  bool get isTournament => mode == GameMode.sitAndGo;
+  // Multi-table tournament.
+  final int mttField, mttBuyIn, mttGuarantee;
+  final String eventName;
+
+  bool get isTournament => mode != GameMode.cash;
+  bool get isMtt => mode == GameMode.mtt;
 
   /// Cash-game buy-in (100 big blinds).
   int get buyIn => bigBlind * buyInBigBlinds;
 
   /// What sitting down costs from the bankroll.
-  int get entryCost => isTournament ? sngBuyIn : buyIn;
+  int get entryCost => switch (mode) { GameMode.cash => buyIn, GameMode.sitAndGo => sngBuyIn, GameMode.mtt => mttBuyIn };
 }
 
 /// How a Sit & Go ended for the player.
@@ -82,6 +91,23 @@ String ordinal(int n) {
 }
 
 const _botNames = ['Ava', 'Milo', 'Nora', 'Theo', 'Iris', 'Leo', 'Zoe', 'Finn', 'June', 'Otto'];
+
+const _fieldFirstNames = [
+  'Ava', 'Milo', 'Nora', 'Theo', 'Iris', 'Leo', 'Zoe', 'Finn', 'June', 'Otto', 'Ruby', 'Ezra', 'Mae', 'Hugo', //
+  'Lena', 'Omar', 'Ida', 'Kai', 'Vera', 'Jude', 'Elsa', 'Remy', 'Tess', 'Abe', 'Lola', 'Nico', 'Rosa', 'Sami',
+];
+
+/// [count] distinct player names for a tournament field ("Ava", "Ava K.").
+List<String> _fieldNames(int count, Random rng) {
+  final out = <String>{};
+  final firsts = List.of(_fieldFirstNames)..shuffle(rng);
+  out.addAll(firsts.take(count));
+  const initials = 'ABCDEFGHJKLMNPRSTVW';
+  while (out.length < count) {
+    out.add('${firsts[rng.nextInt(firsts.length)]} ${initials[rng.nextInt(initials.length)]}.');
+  }
+  return out.toList()..shuffle(rng);
+}
 const _mixedStyles = [
   Personality.tag, Personality.rock, Personality.lag, Personality.station, //
   Personality.maniac, Personality.tag, Personality.rock, Personality.lag,
@@ -93,9 +119,10 @@ class SeatView {
   SeatView({required this.index, required this.name, required this.isHuman, required this.style});
 
   final int index;
-  final String name;
-  final bool isHuman;
-  final String style;
+  // Changeable: in multi-table tournaments players move between tables.
+  String name;
+  bool isHuman;
+  String style;
   int stack = 0, bet = 0, cardsDealt = 0, won = 0;
   bool inHand = false, folded = false, allIn = false, revealed = false, winner = false;
 
@@ -167,6 +194,33 @@ class GameController extends ChangeNotifier {
     final players = <TablePlayer>[];
     final names = List.of(_botNames)..shuffle(_rng);
     final stack = config.isTournament ? config.startingStack.chips : config.buyIn;
+    Personality styleFor(int i) => config.style == 'random'
+        ? Personality.all[_rng.nextInt(Personality.all.length)]
+        : config.style == 'mixed'
+            ? _mixedStyles[(i - 1) % _mixedStyles.length]
+            : Personality.byId(config.style);
+    if (config.isMtt) {
+      // The whole field; you are player 0. Bots get distinct names.
+      final field = _fieldNames(config.mttField - 1, _rng);
+      final everyone = [
+        TablePlayer(name: settings.playerName, stack: stack, isHuman: true),
+        for (var i = 1; i < config.mttField; i++)
+          TablePlayer(name: field[i - 1], stack: stack, personality: styleFor(i), difficulty: config.difficulty),
+      ];
+      mtt = MultiTableTournament(
+        players: everyone,
+        buyIn: config.mttBuyIn,
+        speed: config.speed,
+        guarantee: config.mttGuarantee > 0 ? config.mttGuarantee : null,
+        rng: _rng,
+      );
+      _players = List.filled(mtt!.tableSize, _emptySeat);
+      view = TableView([
+        for (var i = 0; i < mtt!.tableSize; i++) SeatView(index: i, name: '', isHuman: i == heroSeat, style: ''),
+      ]);
+      _seatHero();
+      return;
+    }
     for (var i = 0; i < config.seats; i++) {
       if (i == heroSeat) {
         players.add(TablePlayer(name: settings.playerName, stack: stack, isHuman: true));
@@ -209,6 +263,35 @@ class GameController extends ChangeNotifier {
 
   static const heroSeat = 0;
 
+  /// An empty seat at a multi-table tournament table.
+  static final _emptySeat = TablePlayer(name: '', stack: 0);
+
+  /// Shows the table you're at (after a move, or table breaking): hand seat
+  /// 0 is you, the rest follow round the real table.
+  void _seatHero() {
+    final m = mtt!;
+    final table = m.tableOf(0);
+    final n = table.seats.length;
+    _mttTable = table;
+    _mttOffset = table.seats.indexOf(0);
+    for (var i = 0; i < n; i++) {
+      final id = table.seats[(i + _mttOffset) % n];
+      final p = id == null || !m.isAlive(id) ? _emptySeat : m.players[id];
+      _players[i] = p;
+      view.seats[i]
+        ..name = p.name
+        ..isHuman = p.isHuman
+        ..style = p.personality?.label ?? ''
+        ..stack = p.stack
+        ..outPlace = null
+        ..inHand = false
+        ..folded = false
+        ..label = null
+        ..hole = const []
+        ..cardsDealt = 0;
+    }
+  }
+
   final TableConfig config;
   final Settings settings;
   final HistoryStore history;
@@ -221,10 +304,20 @@ class GameController extends ChangeNotifier {
   /// What the bots have learned about everyone (you included) this session.
   final reads = TableReads();
 
-  /// Exactly one of these is set, depending on [TableConfig.mode].
+  /// For cash games and Sit & Gos one of these is set (see [mtt]).
   CashGame? cash;
   Tournament? tournament;
-  late final List<TablePlayer> _players;
+  late List<TablePlayer> _players;
+
+  /// Multi-table tournament (with [_mttTable] the table you sit at, and hand
+  /// seat i being table seat (i + [_mttOffset]) so you are always seat 0).
+  MultiTableTournament? mtt;
+  MttTable? _mttTable;
+  int _mttOffset = 0;
+  bool _wasFinalTable = false, _wasInMoney = false;
+
+  /// While the rest of a tournament plays out after you bust: players left.
+  int? simulatingLeft;
   late final TableView view;
 
   /// Set when a Sit & Go is over for the player.
@@ -275,7 +368,7 @@ class GameController extends ChangeNotifier {
     _paid = bankroll.debit(
       config.entryCost,
       note: config.isTournament
-          ? 'Sit & Go · ${config.seats} players'
+          ? (config.isMtt ? '${config.eventName} · ${config.mttField} players' : 'Sit & Go · ${config.seats} players')
           : 'Cash table ${config.smallBlind}/${config.bigBlind}',
     );
     if (!config.isTournament && _paid) bankroll.setInPlay(hero.stack);
@@ -315,7 +408,12 @@ class GameController extends ChangeNotifier {
   }
 
   /// True while a Sit & Go is still running for the player (leaving forfeits).
-  bool get tournamentInProgress => tournament != null && outcome == null && _running;
+  bool get tournamentInProgress => (tournament != null || mtt != null) && outcome == null && _running;
+
+  /// Any kind of tournament (Sit & Go or multi-table).
+  bool get isTournament => tournament != null || mtt != null;
+
+  int get prizePool => mtt?.prizePool ?? tournament?.prizePool ?? 0;
 
   @override
   void dispose() {
@@ -343,7 +441,10 @@ class GameController extends ChangeNotifier {
   Future<void> _loop() async {
     while (!_disposed) {
       final t = tournament;
-      if (t == null) {
+      final m = mtt;
+      if (m != null) {
+        if (m.isFinished || outcome != null) return;
+      } else if (t == null) {
         // Cash game: bots who bust buy back in; the player is offered a rebuy.
         final c = cash!;
         for (var i = 0; i < _players.length; i++) {
@@ -365,7 +466,7 @@ class GameController extends ChangeNotifier {
       }
 
 
-      var s = t != null ? t.startNextHand() : cash!.startNextHand();
+      var s = m != null ? _startMttHand(m) : (t != null ? t.startNextHand() : cash!.startNextHand());
       if (t != null && t.handNumber > 1 && (t.handNumber - 1) ~/ t.speed.handsPerLevel != (t.handNumber - 2) ~/ t.speed.handsPerLevel) {
         final lvl = levelAt((t.handNumber - 1) ~/ t.speed.handsPerLevel);
         _pendingHeadline = 'Blinds up: ${formatChips(lvl.smallBlind)}/${formatChips(lvl.bigBlind)}'
@@ -414,11 +515,13 @@ class GameController extends ChangeNotifier {
         s,
         heroSeat: heroSeat,
         reviews: lastHandReviews,
-        mode: t != null ? 'sng' : 'cash',
-        level: t != null ? (t.handNumber - 1) ~/ t.speed.handsPerLevel + 1 : null,
+        mode: m != null ? 'mtt' : (t != null ? 'sng' : 'cash'),
+        level: m != null ? _playingMttLevel + 1 : (t != null ? (t.handNumber - 1) ~/ t.speed.handsPerLevel + 1 : null),
       )));
 
-      if (t == null) {
+      if (m != null) {
+        if (await _settleMttHand(m, s)) return;
+      } else if (t == null) {
         cash!.settle(s);
         if (_paid) bankroll.setInPlay(hero.stack);
       } else {
@@ -483,6 +586,115 @@ class GameController extends ChangeNotifier {
     final results = await Future.wait<Object?>([decision, think]);
     return results.first! as PlayerAction;
   }
+
+  // ---------------------------------------------------------------- multi-table
+
+  int _playingMttLevel = 0;
+
+  /// Balances the field, seats you at your (possibly new) table, and deals.
+  HandState _startMttHand(MultiTableTournament m) {
+    final previous = _mttTable;
+    m.balance();
+    final headlines = <String>[];
+    final table = m.tableOf(0);
+    if (m.isFinalTable && !_wasFinalTable) {
+      _wasFinalTable = true;
+      headlines.add('Final table');
+    } else if (previous != null && !identical(table, previous)) {
+      headlines.add('New table: you move to table ${table.id + 1}');
+    }
+    if (m.clock > 0 && m.clock % m.speed.handsPerLevel == 0) {
+      final lvl = m.currentLevel;
+      headlines.add('Blinds up: ${formatChips(lvl.smallBlind)}/${formatChips(lvl.bigBlind)}'
+          '${lvl.ante > 0 ? ' · ante ${formatChips(lvl.ante)}' : ''}');
+    }
+    if (m.inTheMoney && !_wasInMoney) {
+      _wasInMoney = true;
+      headlines.add('In the money');
+    } else if (m.onBubble) {
+      headlines.add('Bubble: ${m.playersLeft} left, ${m.paidPlaces} paid');
+    }
+    if (headlines.isNotEmpty) _pendingHeadline = headlines.join(' · ');
+    _seatHero();
+    _playingMttLevel = m.levelIndex;
+    return m.startHandAt(_mttTable!, offset: _mttOffset);
+  }
+
+  /// After your hand: record busts, play a hand at every other table.
+  /// Returns true when the tournament is over for you.
+  Future<bool> _settleMttHand(MultiTableTournament m, HandState s) async {
+    final table = _mttTable!;
+    final n = table.seats.length;
+    final out = m.settle(table, s, offset: _mttOffset);
+    if (out.isNotEmpty) {
+      for (final e in out) {
+        final seat = (table.seats.indexOf(e.seat) - _mttOffset + n) % n;
+        view.seats[seat]
+          ..outPlace = e.place
+          ..label = ordinal(e.place);
+      }
+      view.headline = [
+        ...out.reversed.map((e) => e.seat == 0 ? 'You finish ${ordinal(e.place)}' : '${m.players[e.seat].name} finishes ${ordinal(e.place)}'),
+        '${m.playersLeft} left',
+      ].join(' · ');
+      _notify();
+    }
+    if (m.places.containsKey(0)) {
+      await _wait(1400);
+      await _finishMtt(m);
+      return true;
+    }
+    m.playOtherTables(skip: table, reads: reads);
+    m.clock++;
+    if (m.isFinished) {
+      await _finishMtt(m);
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _finishMtt(MultiTableTournament m) async {
+    // Play the rest out (bots only), yielding so the screen stays responsive.
+    while (!m.isFinished && !_disposed) {
+      for (var k = 0; k < 4 && !m.isFinished; k++) {
+        m.playOtherTables(reads: reads);
+        m.balance();
+        m.clock++;
+      }
+      simulatingLeft = m.playersLeft;
+      _notify();
+      await Future<void>.delayed(Duration.zero);
+    }
+    if (_disposed) return;
+    simulatingLeft = null;
+    final place = m.places[0]!;
+    final prize = m.prizeFor(0);
+    if (prize > 0) bankroll.credit(prize, note: '${config.eventName} ${ordinal(place)}');
+    unawaited(tournaments.add(TournamentResult(
+      at: DateTime.now(),
+      players: m.field,
+      buyIn: m.buyIn,
+      place: place,
+      prize: prize,
+      speed: m.speed,
+      payoutStyle: PayoutStyle.standard,
+      format: 'mtt',
+      eventName: config.eventName,
+    )));
+    final winner = m.winner;
+    outcome = TournamentOutcome(
+      place: place,
+      players: m.field,
+      prize: prize,
+      buyIn: m.buyIn,
+      winnerName: winner == null ? '' : (winner == 0 ? 'You' : m.players[winner].name),
+    );
+    sounds.play(place == 1 ? Sfx.win : Sfx.collect);
+    _notify();
+  }
+
+  /// Your rank by chips among the players left (1 = chip leader).
+  int get mttRank => (mtt?.chipCounts.indexOf(0) ?? -1) + 1;
 
   // ---------------------------------------------------------------- tournament
 
@@ -551,12 +763,25 @@ class GameController extends ChangeNotifier {
   }
 
   String get tournamentTitle {
+    final m = mtt;
+    if (m != null) {
+      final lvl = levelAt(_playingMttLevel);
+      return '${config.eventName} · Level ${_playingMttLevel + 1} · ${formatChips(lvl.smallBlind)}/${formatChips(lvl.bigBlind)}'
+          '${lvl.ante > 0 ? ' · ante ${formatChips(lvl.ante)}' : ''}';
+    }
     final lvl = levelAt(playingLevel);
     return 'Sit & Go · Level ${playingLevel + 1} · ${formatChips(lvl.smallBlind)}/${formatChips(lvl.bigBlind)}'
         '${lvl.ante > 0 ? ' · ante ${formatChips(lvl.ante)}' : ''}';
   }
 
   String get tournamentStatus {
+    final m = mtt;
+    if (m != null) {
+      if (m.isFinished || outcome != null) return 'Tournament over · ${m.field} players';
+      if (simulatingLeft != null) return 'Playing out the rest: $simulatingLeft left';
+      final stage = m.isFinalTable ? 'final table' : '${m.tables.length} tables';
+      return '${m.playersLeft} of ${m.field} left · $stage · avg ${formatChips(m.averageStack)} · you are ${ordinal(mttRank)}';
+    }
     final t = tournament!;
     if (t.isFinished || outcome != null) return 'Tournament over · ${t.startingPlayers} players';
     final untilNext = t.speed.handsPerLevel * (playingLevel + 1) - t.handNumber;
@@ -567,6 +792,7 @@ class GameController extends ChangeNotifier {
   }
 
   TournamentInfo? get _tournamentInfo {
+    if (mtt != null) return mtt!.info;
     final t = tournament;
     return t == null ? null : TournamentInfo(prizes: t.prizes, playersLeft: t.playersLeft);
   }

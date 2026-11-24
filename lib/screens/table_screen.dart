@@ -161,13 +161,13 @@ class _TopBar extends StatelessWidget {
             builder: (context, _) => Column(
               children: [
                 Text(
-                  controller.tournament != null
+                  controller.isTournament
                       ? controller.tournamentTitle
                       : "No-Limit Hold'em · ${cfg.smallBlind}/${cfg.bigBlind}",
                   style: Typo.headline(p.label),
                 ),
                 Text(
-                  controller.tournament != null
+                  controller.isTournament
                       ? controller.tournamentStatus
                       : (controller.view.handNumber > 0 ? 'Hand #${controller.view.handNumber}' : 'Shuffling…'),
                   style: Typo.caption(p.secondaryLabel),
@@ -194,8 +194,8 @@ class _TopBar extends StatelessWidget {
               return Row(children: [
                 if (acc != null && SettingsScope.of(context).showCoachAtTable)
                   readout('ACCURACY', Text('${acc.round()}%', style: Typo.number(p.label, size: 15))),
-                if (controller.tournament != null)
-                  readout('PRIZE POOL', Text(formatChips(controller.tournament!.prizePool), style: Typo.number(p.label, size: 15)))
+                if (controller.isTournament)
+                  readout('PRIZE POOL', Text(formatChips(controller.prizePool), style: Typo.number(p.label, size: 15)))
                 else
                 readout(
                   'SESSION',
@@ -208,6 +208,15 @@ class _TopBar extends StatelessWidget {
               ]);
             },
           ),
+          if (controller.mtt != null) ...[
+            IconPill(
+              icon: CupertinoIcons.list_number,
+              tooltip: 'Tournament: standings and payouts',
+              onPressed: () => showPanel(context,
+                  title: controller.config.eventName, width: 460, builder: (_) => FieldPanel(controller: controller)),
+            ),
+            const SizedBox(width: Space.s),
+          ],
           IconPill(
             icon: CupertinoIcons.chart_bar_alt_fill,
             tooltip: 'Statistics',
@@ -299,8 +308,8 @@ Future<void> leaveTable(BuildContext context, GameController c) async {
   if (c.tournamentInProgress) {
     final ok = await confirmAction(
       context,
-      title: 'Leave the Sit & Go?',
-      message: 'You\'ll forfeit your ${formatChips(c.config.sngBuyIn)} buy-in. Your seat won\'t be kept.',
+      title: c.config.isMtt ? 'Leave the tournament?' : 'Leave the Sit & Go?',
+      message: 'You\'ll forfeit your ${formatChips(c.config.entryCost)} buy-in. Your seat won\'t be kept.',
       action: 'Leave',
     );
     if (!ok || !context.mounted) return;
@@ -318,7 +327,9 @@ class _ResultsOverlay extends StatelessWidget {
     final p = Palette.of(context);
     final o = controller.outcome!;
     final net = o.prize - o.buyIn;
-    final title = o.won ? 'You won the Sit & Go!' : 'You finished ${ordinal(o.place)} of ${o.players}';
+    final title = o.won
+        ? (controller.config.isMtt ? 'You won the ${controller.config.eventName}!' : 'You won the Sit & Go!')
+        : 'You finished ${ordinal(o.place)} of ${o.players}';
     final subtitle = o.won
         ? 'Last one standing out of ${o.players}.'
         : o.inTheMoney
@@ -403,6 +414,74 @@ class _Figure extends StatelessWidget {
         const SizedBox(height: 2),
         Text(value, style: Typo.number(color ?? p.label, size: 20)),
       ]),
+    );
+  }
+}
+
+/// Standings and payouts in a multi-table tournament.
+class FieldPanel extends StatelessWidget {
+  const FieldPanel({super.key, required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final m = controller.mtt!;
+        final leaders = m.chipCounts.take(10).toList();
+        final rank = controller.mttRank;
+        Widget row(String a, String b, {bool strong = false, Color? color}) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(children: [
+                Expanded(child: Text(a, style: (strong ? Typo.headline : Typo.body)(color ?? p.label))),
+                Text(b, style: Typo.number(color ?? p.secondaryLabel, size: 13)),
+              ]),
+            );
+        return ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xl),
+          children: [
+            Row(children: [
+              for (final (label, value) in [
+                ('Left', '${m.playersLeft} / ${m.field}'),
+                ('Your rank', rank > 0 ? ordinal(rank) : '–'),
+                ('Average', formatChips(m.averageStack)),
+              ])
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(label, style: Typo.caption(p.secondaryLabel)),
+                    Text(value, style: Typo.number(p.label, size: 17)),
+                  ]),
+                ),
+            ]),
+            const SizedBox(height: Space.l),
+            Text('CHIP LEADERS', style: Typo.caption(p.secondaryLabel).copyWith(letterSpacing: 1)),
+            for (final (i, id) in leaders.indexed)
+              row('${i + 1}. ${id == 0 ? 'You' : m.players[id].name}', formatChips(m.players[id].stack),
+                  color: id == 0 ? p.accent : null),
+            if (rank > 10) row('$rank. You', formatChips(m.players[0].stack), color: p.accent),
+            const SizedBox(height: Space.l),
+            Text('PAYOUTS · ${m.paidPlaces} PAID', style: Typo.caption(p.secondaryLabel).copyWith(letterSpacing: 1)),
+            for (final (i, prize) in m.prizes.indexed)
+              if (i < 9 || i == m.prizes.length - 1)
+                row(
+                  i == m.prizes.length - 1 && i >= 9 ? '${ordinal(i + 1)} (min cash)' : ordinal(i + 1),
+                  formatChips(prize),
+                  strong: i == 0,
+                  color: m.playersLeft <= i + 1 ? p.accent : null,
+                ),
+            const SizedBox(height: Space.s),
+            Text(
+              m.inTheMoney
+                  ? 'Everyone left is in the money.'
+                  : '${m.playersLeft - m.paidPlaces} more to go before the money.',
+              style: Typo.callout(p.secondaryLabel),
+            ),
+          ],
+        );
+      },
     );
   }
 }
