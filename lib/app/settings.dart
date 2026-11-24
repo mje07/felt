@@ -58,6 +58,9 @@ class Settings extends ChangeNotifier {
   /// Label each opponent at the table with their playing style.
   bool showOpponentStyles = true;
 
+  /// Invite-code relay for games with friends over the internet ('' = off).
+  String relayUrl = '';
+
   void _read() {
     final p = _prefs;
     if (p == null) return;
@@ -72,6 +75,7 @@ class Settings extends ChangeNotifier {
     showCoachAtTable = p.getBool('coachAtTable') ?? true;
     autoUpdate = p.getBool('autoUpdate') ?? true;
     showOpponentStyles = p.getBool('opponentStyles') ?? true;
+    relayUrl = p.getString('relayUrl') ?? '';
     playerName = p.getString('playerName') ?? 'You';
   }
 
@@ -90,6 +94,7 @@ class Settings extends ChangeNotifier {
       p.setBool('coachAtTable', showCoachAtTable);
       p.setBool('autoUpdate', autoUpdate);
       p.setBool('opponentStyles', showOpponentStyles);
+      p.setString('relayUrl', relayUrl);
       p.setString('playerName', playerName);
     }
     notifyListeners();

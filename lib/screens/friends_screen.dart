@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:poker_engine/poker_engine.dart';
 
 import '../app/controller.dart';
@@ -11,6 +12,7 @@ import '../app/theme.dart';
 import '../net/client.dart';
 import '../net/host.dart';
 import '../net/protocol.dart';
+import '../net/relay_link.dart';
 import '../widgets/common.dart';
 import '../widgets/controls.dart';
 import 'lesson_screen.dart';
@@ -55,6 +57,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   // Join form.
   final _address = TextEditingController();
+  final _code = TextEditingController();
+  late final _relay = TextEditingController(text: SettingsScope.of(context).relayUrl);
+  String? _relayError;
   final _discovery = LanDiscovery();
   StreamSubscription<List<LanGame>>? _lanSub;
   List<LanGame> _lan = const [];
@@ -83,6 +88,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
     _client?.leave();
     _gameName.dispose();
     _address.dispose();
+    _code.dispose();
+    _relay.dispose();
     super.dispose();
   }
 
@@ -102,6 +109,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       actionSeconds: _seconds,
     );
     final host = HomeGameHost(settings, hostName: _playerName);
+    final relayUrl = SettingsScope.of(context).relayUrl;
     setState(() {
       _busy = true;
       _error = null;
@@ -119,7 +127,21 @@ class _FriendsScreenState extends State<FriendsScreen> {
         return;
       }
     }
+    _relayError = null;
+    final relay = relayBase(relayUrl);
+    if (relay != null) {
+      try {
+        await host.openRelay(relay);
+      } catch (_) {
+        _relayError = 'Couldn\'t reach the invite-code server at ${relay.host}, so there\'s no code this time. '
+            'Friends can still join on your network or by address.';
+      }
+    }
     final addresses = await localAddresses();
+    if (!mounted) {
+      unawaited(host.close());
+      return;
+    }
     host.addListener(_changed);
     setState(() {
       _host = host;
@@ -314,6 +336,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
         ]),
         const SizedBox(height: Space.xl),
         PillButton(label: 'Open table', style: PillStyle.filled, minWidth: 220, onPressed: _busy ? null : _openTable),
+        const SizedBox(height: Space.xxl),
+        _relayCard(p),
       ]);
 
   Widget _joinForm(Palette p) {
@@ -331,6 +355,36 @@ class _FriendsScreenState extends State<FriendsScreen> {
             ),
       ]),
       const SizedBox(height: Space.l),
+      SettingsCard(title: 'Invite code', icon: CupertinoIcons.globe, children: [
+        if (relayBase(SettingsScope.of(context).relayUrl) == null)
+          const SettingRow(
+            label: 'Invite codes are off',
+            detail: 'Set an invite-code server below to join friends anywhere with a 6-letter code.',
+          )
+        else
+          SettingRow(
+            label: 'Code from the host',
+            trailing: FeltTextField(
+              controller: _code,
+              placeholder: 'K7QH2M',
+              maxLength: inviteCodeLength,
+              width: 160,
+              onChanged: (_) => setState(() {}),
+            ),
+            below: Padding(
+              padding: const EdgeInsets.only(top: Space.s),
+              child: PillButton(
+                label: 'Join with code',
+                minWidth: 0,
+                height: 32,
+                onPressed: _busy || _code.text.trim().length != inviteCodeLength
+                    ? null
+                    : () => _join(relayJoinUri(relayBase(SettingsScope.of(context).relayUrl)!, _code.text)),
+              ),
+            ),
+          ),
+      ]),
+      const SizedBox(height: Space.l),
       SettingsCard(title: 'By address', icon: CupertinoIcons.link, children: [
         SettingRow(
           label: 'Host address',
@@ -345,14 +399,38 @@ class _FriendsScreenState extends State<FriendsScreen> {
       ]),
       const SizedBox(height: Space.xl),
       PillButton(
-        label: _busy ? 'Joining…' : 'Join',
+        label: _busy ? 'Joining…' : 'Join by address',
         style: PillStyle.filled,
         minWidth: 220,
         onPressed: _busy || typed == null ? null : () => _join(typed),
       ),
+      const SizedBox(height: Space.xxl),
+      _relayCard(p),
     ]);
   }
 
+  /// Where invite codes come from: a relay the player (or a friend) runs.
+  Widget _relayCard(Palette p) => SettingsCard(
+        title: 'Invite-code server',
+        icon: CupertinoIcons.cloud,
+        children: [
+          SettingRow(
+            label: 'Server address',
+            detail: 'For games over the internet. Felt includes a small relay you can deploy for free (see the '
+                'README); everyone at the table uses the same address. Leave empty to play on your network only.',
+            trailing: FeltTextField(
+              controller: _relay,
+              placeholder: 'felt-relay.fly.dev',
+              width: 220,
+              onChanged: (v) {
+                final s = SettingsScope.of(context);
+                s.update((s) => s.relayUrl = v.trim());
+                setState(() {});
+              },
+            ),
+          ),
+        ],
+      );
   Widget _seatList(Palette p, List<(String, bool)> players, int seats) => SettingsCard(
         title: 'At the table · ${players.length} of $seats',
         icon: CupertinoIcons.person_2_fill,
@@ -379,6 +457,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
         style: Typo.body(p.secondaryLabel).copyWith(height: 1.5),
       ),
       const SizedBox(height: Space.xl),
+      if (host.inviteCode != null) ...[
+        _InviteCode(code: host.inviteCode!),
+        const SizedBox(height: Space.l),
+      ] else if (_relayError != null) ...[
+        Text(_relayError!, style: Typo.callout(p.secondaryLabel)),
+        const SizedBox(height: Space.l),
+      ],
       _seatList(p, [(host.hostName, true), for (final f in host.players) (f.name, f.connected)], host.settings.seats),
       const SizedBox(height: Space.xl),
       Wrap(spacing: Space.s, runSpacing: Space.s, children: [
@@ -408,4 +493,35 @@ class _FriendsScreenState extends State<FriendsScreen> {
         const SizedBox(height: Space.xl),
         PillButton(label: 'Leave', onPressed: _cancel),
       ]);
+}
+
+/// The invite code, big and easy to read out over a call.
+class _InviteCode extends StatelessWidget {
+  const _InviteCode({required this.code});
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return GlassPanel(
+      radius: Radii.l,
+      padding: const EdgeInsets.symmetric(horizontal: Space.xl, vertical: Space.l),
+      child: Row(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('INVITE CODE', style: Typo.caption(p.secondaryLabel).copyWith(letterSpacing: 0.8)),
+            const SizedBox(height: 4),
+            Text(code, style: Typo.number(p.label, size: 34, weight: FontWeight.w700).copyWith(letterSpacing: 6)),
+            const SizedBox(height: 4),
+            Text('Friends enter this under Join a game, from anywhere.', style: Typo.callout(p.secondaryLabel)),
+          ]),
+        ),
+        PillButton(
+          label: 'Copy',
+          minWidth: 0,
+          onPressed: () => Clipboard.setData(ClipboardData(text: code)),
+        ),
+      ]),
+    );
+  }
 }

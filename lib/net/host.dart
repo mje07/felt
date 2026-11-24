@@ -6,6 +6,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:poker_engine/poker_engine.dart';
 
 import 'protocol.dart';
+import 'relay_link.dart';
 
 /// How a home game is set up.
 class HomeGameSettings {
@@ -73,6 +74,7 @@ class HomeGameHost extends ChangeNotifier {
   bool started = false;
   HttpServer? _server;
   LanAnnouncer? _announcer;
+  RelayHostLink? _relay;
   int? port;
 
   /// Set when the game is reachable through the relay.
@@ -112,6 +114,23 @@ class HomeGameHost extends ChangeNotifier {
           name: settings.name, host: '', port: this.port!, players: players.length + 1, seats: settings.seats))
         ..start();
     }
+  }
+
+  /// Also takes friends through the invite-code relay at [base] and sets
+  /// [inviteCode]. Throws if the relay can't be reached.
+  Future<void> openRelay(Uri base) async {
+    final link = await RelayHostLink.connect(base);
+    _relay = link;
+    inviteCode = link.code;
+    link.connections.listen(accept);
+    unawaited(link.closed.then((_) {
+      if (identical(_relay, link)) {
+        _relay = null;
+        inviteCode = null;
+        notifyListeners();
+      }
+    }));
+    notifyListeners();
   }
 
   /// Handles a new connection: waits for its hello, then seats it (or
@@ -332,5 +351,6 @@ class HomeGameHost extends ChangeNotifier {
     for (final p in players) {
       await p.channel?.close();
     }
+    await _relay?.close();
   }
 }

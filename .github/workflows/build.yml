@@ -22,6 +22,12 @@ jobs:
           dart test
           dart test --run-skipped -t slow
           dart run tool/simulate.dart --hands 50000
+      - name: Relay server tests
+        working-directory: server/relay
+        run: |
+          dart pub get
+          dart analyze
+          dart test
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
