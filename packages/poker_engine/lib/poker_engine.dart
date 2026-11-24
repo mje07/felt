@@ -9,6 +9,8 @@ export 'src/rules.dart';
 export 'src/pots.dart';
 export 'src/equity.dart';
 export 'src/range_model.dart';
+export 'src/ranges/weighted_range.dart';
+export 'src/equity_lab.dart';
 export 'src/cash_game.dart';
 export 'src/history.dart';
 export 'src/icm.dart';

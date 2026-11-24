@@ -301,11 +301,13 @@ class _RightHalf extends CustomClipper<Rect> {
 
 /// Single-line text input in Felt's style (tinted, rounded, no iOS chrome).
 class FeltTextField extends StatelessWidget {
-  const FeltTextField({super.key, required this.controller, this.placeholder, this.maxLength, this.width = 200});
+  const FeltTextField(
+      {super.key, required this.controller, this.placeholder, this.maxLength, this.width = 200, this.onChanged});
   final TextEditingController controller;
   final String? placeholder;
   final int? maxLength;
   final double width;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -316,6 +318,7 @@ class FeltTextField extends StatelessWidget {
         controller: controller,
         placeholder: placeholder,
         maxLength: maxLength,
+        onChanged: onChanged,
         style: Typo.body(p.label),
         placeholderStyle: Typo.body(p.tertiaryLabel),
         cursorColor: p.accent,

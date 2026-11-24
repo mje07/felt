@@ -15,6 +15,7 @@ import 'package:felt/app/theme.dart';
 import 'package:felt/screens/history_panel.dart';
 import 'package:felt/screens/panel_route.dart';
 import 'package:felt/screens/range_screen.dart';
+import 'package:felt/screens/equity_lab_screen.dart';
 import 'package:felt/screens/settings_panel.dart';
 import 'package:felt/screens/stats_screen.dart';
 import 'package:felt/screens/training_screen.dart';
@@ -70,6 +71,7 @@ Future<void> _snap(WidgetTester tester, String name) async {
 void main() {
   statsShots();
   coachShots();
+  suiteShots();
   settingsShots();
   historyShots();
   sngShots();
@@ -457,6 +459,29 @@ void sngShots() {
       await tester.tap(find.text('Shove'));
       await tester.pumpAndSettle();
       await _snap(tester, 'pushfold_$mode');
+    });
+  }
+}
+
+void suiteShots() {
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+
+    testWidgets('equity lab $mode', (tester) async {
+      tester.view.physicalSize = const Size(1280, 1100);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(_themed(dark, const EquityLabScreen()));
+      for (final c in ['Ks', '7d', '2c']) {
+        await tester.tap(find.byKey(ValueKey('pick-$c')));
+        await tester.pump();
+      }
+      await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 3)));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 3)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Top pair, good kicker'));
+      await tester.pumpAndSettle();
+      await _snap(tester, 'equity_lab_$mode');
     });
   }
 }
