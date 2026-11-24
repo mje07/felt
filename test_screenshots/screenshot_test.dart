@@ -101,6 +101,7 @@ void main() {
         child: SettingsScope(
           settings: settings,
           child: CupertinoApp(
+            debugShowCheckedModeBanner: false,
             theme: CupertinoThemeData(
               brightness: dark ? Brightness.dark : Brightness.light,
               textTheme: const CupertinoTextThemeData(

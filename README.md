@@ -1,6 +1,7 @@
 # Felt
 
 A clean, Apple-inspired No-Limit Texas Hold'em table for **Windows and Linux**.
+Website: https://mje07.github.io/felt/
 Play a cash game against AI opponents with distinct styles. Built with Flutter, so it ships native desktop binaries with no Electron or webview.
 
 ## Layout

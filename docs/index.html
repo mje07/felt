@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Felt Poker</title>
+<meta name="description" content="Felt is a clean, offline No-Limit Texas Hold'em app for Windows and Linux, with AI opponents and a coach that grades every decision.">
+<meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Felt Poker">
+<meta property="og:description" content="Offline No-Limit Hold'em with a built-in coach. Windows and Linux.">
+<meta property="og:image" content="assets/shots/table_dark_decision.png">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="spade" viewBox="0 0 24 24"><path d="M12 2s-8.5 6.6-9.4 11c-.6 3.1 1.6 5.6 4.5 5.6 1.8 0 3.2-.9 3.9-2.1-.2 2.4-1 4.2-2.5 5.5h7c-1.5-1.3-2.3-3.1-2.5-5.5.7 1.2 2.1 2.1 3.9 2.1 2.9 0 5.1-2.5 4.5-5.6C20.5 8.6 12 2 12 2z"/></symbol>
+  <symbol id="heart" viewBox="0 0 24 24"><path d="M12 21.5s-7.6-5-9.7-9.4C.8 8.8 2.7 4.5 6.7 4.5c2.3 0 3.8 1.3 5.3 3.3 1.5-2 3-3.3 5.3-3.3 4 0 5.9 4.3 4.4 7.6-2.1 4.4-9.7 9.4-9.7 9.4z"/></symbol>
+  <symbol id="diamond" viewBox="0 0 24 24"><path d="M12 1.5 20.5 12 12 22.5 3.5 12z"/></symbol>
+  <symbol id="club" viewBox="0 0 24 24"><path d="M12 2.2a4.7 4.7 0 0 0-4.4 6.4A4.7 4.7 0 1 0 10.5 17c-.3 2-1.1 3.5-2.5 4.6h8c-1.4-1.1-2.2-2.6-2.5-4.6a4.7 4.7 0 1 0 2.9-8.4A4.7 4.7 0 0 0 12 2.2z"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.4 14.2-4.3-4.3 1.4-1.4 2.9 2.9 6-6 1.4 1.4-7.4 7.4z"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="m12 2 2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.2 5.8 20.9l1.6-7L2 9.2l7.1-.6z"/></symbol>
+  <symbol id="warn" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></symbol>
+  <symbol id="monitor" viewBox="0 0 24 24"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v9h16V6H4z"/></symbol>
+  <symbol id="terminal" viewBox="0 0 24 24"><path d="M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v12h16V6H4zm2.3 2.3L10 12l-3.7 3.7-1.4-1.4L7.2 12 4.9 9.7l1.4-1.4zM11 14h7v2h-7v-2z"/></symbol>
+</svg>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><img src="assets/icon.png" alt="">Felt</a>
+    <nav class="nav-links">
+      <a class="hide-sm" href="#coach">Coach</a>
+      <a class="hide-sm" href="#stats">Statistics</a>
+      <a class="hide-sm" href="#tournaments">Sit &amp; Go</a>
+      <a href="https://github.com/mje07/felt">GitHub</a>
+      <a class="pill primary small" href="#download">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <div class="hero-cards" aria-hidden="true">
+        <div class="card"><span class="rank">A</span><svg class="pip"><use href="#spade"/></svg><svg class="big"><use href="#spade"/></svg></div>
+        <div class="card red"><span class="rank">K</span><svg class="pip"><use href="#heart"/></svg><svg class="big"><use href="#heart"/></svg></div>
+      </div>
+      <h1>Felt</h1>
+      <p class="lede">No-Limit Texas Hold'em against opponents with real personalities, and a coach that grades every decision you make.</p>
+      <div class="ctas">
+        <a class="pill primary" href="#download">Download for Windows<small>Installer · 12 MB</small></a>
+        <a class="pill secondary" href="https://github.com/mje07/felt">View on GitHub<small>Linux · build from source</small></a>
+      </div>
+      <p class="meta"><span>Free and open source</span><span>Fully offline</span><span>No account</span></p>
+
+      <div class="window reveal">
+        <div class="bar">Felt<i></i><i></i><i></i><i></i></div>
+        <picture>
+          <source srcset="assets/shots/table_dark_decision.png" media="(prefers-color-scheme: dark)">
+          <img src="assets/shots/table_light_decision.png" width="1280" height="800" alt="A six-player Felt table on the flop, with your two cards face up and an action bar offering Fold, Check and Bet with pot-sized presets.">
+        </picture>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap center">
+      <p class="eyebrow">Everything at the table</p>
+      <h2>Play. Get graded. Improve.</h2>
+      <p class="sub">Felt is built for players who want to get better, not just click through hands.</p>
+      <div class="tiles" style="text-align:left">
+        <div class="tile reveal"><div class="k">Opponents</div><div class="v">5 styles</div><p>Rock, Shark, Maverick, Station and Wildcard, at three skill levels.</p></div>
+        <div class="tile reveal"><div class="k">Coach</div><div class="v">Every decision</div><p>Graded Best to Blunder, with the reason and the better play.</p></div>
+        <div class="tile reveal"><div class="k">Training</div><div class="v">Drills</div><p>Outs, equity, pot odds, preflop ranges and push/fold quizzes.</p></div>
+        <div class="tile reveal"><div class="k">Modes</div><div class="v">Cash &amp; Sit &amp; Go</div><p>Stakes from 1/2 to 100/200, or 2–9 player tournaments.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="coach">
+    <div class="wrap feature">
+      <div class="copy reveal">
+        <p class="eyebrow">The coach</p>
+        <h2>Know why, not just what.</h2>
+        <p class="sub">After every hand, Felt replays your decisions street by street. It estimates your equity against the range your opponent is likely to hold, and tells you what it cost when you strayed.</p>
+        <div class="grades">
+          <span class="grade best"><svg><use href="#star"/></svg>Best</span>
+          <span class="grade best" style="filter:saturate(.4)"><svg><use href="#check"/></svg>Good</span>
+          <span class="grade inacc"><svg><use href="#warn"/></svg>Inaccuracy</span>
+          <span class="grade inacc" style="background:rgba(255,105,70,.16);color:#E0562F"><svg><use href="#warn"/></svg>Mistake</span>
+          <span class="grade inacc" style="background:rgba(255,59,48,.14);color:var(--destructive)"><svg><use href="#warn"/></svg>Blunder</span>
+        </div>
+        <ul>
+          <li><svg><use href="#check"/></svg><span><b>Live or after the hand.</b> Hide the grades while you play; they're still recorded for your stats.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>Tournament aware.</b> Push/fold charts at short stacks, and ICM when you face an all-in near the bubble.</span></li>
+        </ul>
+      </div>
+      <div class="panel review reveal" role="figure" aria-label="Example hand review">
+        <div class="street">
+          <div class="head">Preflop <span class="grade best"><svg><use href="#star"/></svg>Best</span></div>
+          <p class="act">You: <b>Raise to 27</b></p>
+          <p class="why">KJs is in the baseline raising range from the cutoff.</p>
+        </div>
+        <div class="street">
+          <div class="head">Flop <span class="grade best"><svg><use href="#star"/></svg>Best</span></div>
+          <p class="act">You: <b>Bet 30 (½ pot)</b></p>
+          <p class="why">With about 58% equity against their likely range (top 50%), a half-pot bet was the strongest option.</p>
+          <div class="eq">Equity <b>58%</b></div>
+        </div>
+        <div class="street">
+          <div class="head">Turn <span class="grade inacc"><svg><use href="#warn"/></svg>Inaccuracy</span><span class="cost">−2.3 bb</span></div>
+          <p class="act">You: <b>Bet 65 (½ pot)</b><span class="coach">Coach: <b>Check</b></span></p>
+          <p class="why">With about 51% equity, betting mostly gets called by better hands and folds out worse ones.</p>
+          <div class="eq">Equity <b>51%</b></div>
+        </div>
+        <div class="street">
+          <div class="head">River <span class="grade best"><svg><use href="#star"/></svg>Best</span></div>
+          <p class="act">You: <b>Fold</b></p>
+          <p class="why">19% equity when you needed 25%. A disciplined fold.</p>
+          <div class="eq">Equity <b>19%</b> Needed <b>25%</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="stats">
+    <div class="wrap feature flip">
+      <div class="copy reveal">
+        <p class="eyebrow">Statistics</p>
+        <h2>Find out what kind of player you are.</h2>
+        <p class="sub">Every hand you play is saved on your computer and turned into the numbers serious players track. Felt reads them back to you in plain words.</p>
+        <ul>
+          <li><svg><use href="#check"/></svg><span><b>Your playing style.</b> Shark, Rock, Maverick, Calling Station and more, placed on a tight/loose and passive/aggressive map.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>The standard stats.</b> VPIP, PFR, 3-bet, aggression, c-bet, showdown rates and win rate.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>Where you leak.</b> Results by position and by starting hand, recurring mistakes, and coaching notes.</span></li>
+        </ul>
+      </div>
+      <div class="shot crop-stats reveal">
+        <picture>
+          <source srcset="assets/shots/stats_dark.png" media="(prefers-color-scheme: dark)">
+          <img src="assets/shots/stats_light.png" loading="lazy" alt="The Statistics screen: playing style 'The Shark', a style map, stat tiles for VPIP, PFR and more, and a decision-quality bar.">
+        </picture>
+      </div>
+    </div>
+  </section>
+
+  <section id="training">
+    <div class="wrap feature">
+      <div class="copy reveal">
+        <p class="eyebrow">Training</p>
+        <h2>Drills that target your leaks.</h2>
+        <p class="sub">Ten-question sessions on counting outs, equity, pot odds, preflop ranges and push/fold. Felt recommends the drill that fixes your most common mistake.</p>
+      </div>
+      <div class="shot crop-drill reveal">
+        <picture>
+          <source srcset="assets/shots/training_question_dark.png" media="(prefers-color-scheme: dark)">
+          <img src="assets/shots/training_question_light.png" loading="lazy" alt="A counting-outs drill: hole cards five and two against a three-queen-ace flop, with the answer explained.">
+        </picture>
+      </div>
+    </div>
+  </section>
+
+  <section id="ranges">
+    <div class="wrap feature flip">
+      <div class="copy reveal">
+        <p class="eyebrow">Range charts</p>
+        <h2>Every opening range, one click away.</h2>
+        <p class="sub">Baseline 100 big blind ranges for every seat, for facing raises and 3-bets, and push/fold charts from 15 big blinds down to 4.</p>
+      </div>
+      <div class="shot reveal">
+        <picture>
+          <source srcset="assets/shots/pushfold_dark.png" media="(prefers-color-scheme: dark)">
+          <img src="assets/shots/pushfold_light.png" loading="lazy" alt="A 13 by 13 push/fold chart for the button at 10 big blinds; shoving hands are highlighted in blue.">
+        </picture>
+      </div>
+    </div>
+  </section>
+
+  <section id="tournaments">
+    <div class="wrap feature">
+      <div class="copy reveal">
+        <p class="eyebrow">Sit &amp; Go</p>
+        <h2>Buy in. Outlast the table.</h2>
+        <p class="sub">Single-table tournaments for 2 to 9 players with rising blinds and antes. Winner takes all, or pay the top places.</p>
+        <ul>
+          <li><svg><use href="#check"/></svg><span><b>One bankroll.</b> Buy-ins, prizes and cash-game winnings all move the same balance.</span></li>
+          <li><svg><use href="#check"/></svg><span><b>Hyper, Turbo or Regular.</b> Blinds rise every 5, 8 or 12 hands, from 1,000, 1,500 or 3,000 chips.</span></li>
+        </ul>
+      </div>
+      <div class="shot crop-sng reveal">
+        <picture>
+          <source srcset="assets/shots/sng_results_dark.png" media="(prefers-color-scheme: dark)">
+          <img src="assets/shots/sng_results_light.png" loading="lazy" alt="Sit &amp; Go results over the table: You finished 5th of 6, with Lobby and Play Again buttons.">
+        </picture>
+      </div>
+    </div>
+  </section>
+
+  <div class="felt-band">
+    <div class="wrap center">
+      <p class="eyebrow">Under the hood</p>
+      <h2>A real poker engine, not a toy.</h2>
+      <p class="sub">Written from scratch in Dart and tested hand by hand.</p>
+      <div class="tiles" style="text-align:left">
+        <div class="tile reveal"><div class="k">Hand evaluator</div><div class="v">7,462</div><p>Distinct hand ranks, checked against all 133 million seven-card hands.</p></div>
+        <div class="tile reveal"><div class="k">Rules</div><div class="v">Casino rules</div><p>Min-raises, short all-ins, side pots and odd chips, the way a casino deals them.</p></div>
+        <div class="tile reveal"><div class="k">Shuffle</div><div class="v">Fisher–Yates</div><p>Driven by the system's secure random generator, with a burn card each street.</p></div>
+        <div class="tile reveal"><div class="k">Native</div><div class="v">No Electron</div><p>A Flutter desktop app. Starts fast, stays light, and never needs the internet.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <section id="download">
+    <div class="wrap center">
+      <p class="eyebrow">Download</p>
+      <h2>Take a seat.</h2>
+      <p class="sub">Free, open source, and yours to keep. Your hands and stats never leave your computer.</p>
+    </div>
+    <div class="wrap downloads">
+      <div class="panel reveal">
+        <div class="os"><svg><use href="#monitor"/></svg><h3 style="margin:0">Windows</h3></div>
+        <p>Windows 10 or 11, 64-bit. The installer adds Felt to the Start menu and needs no admin rights.</p>
+        <p class="note">Felt isn't code-signed yet, so Windows may show “Windows protected your PC”. Choose More info → Run anyway.</p>
+        <a class="pill primary" href="https://github.com/mje07/felt/releases/latest">Download Felt for Windows</a>
+      </div>
+      <div class="panel reveal">
+        <div class="os"><svg><use href="#terminal"/></svg><h3 style="margin:0">Linux</h3></div>
+        <p>Build it with Flutter. You'll need <code>clang cmake ninja-build pkg-config libgtk-3-dev</code>.</p>
+<pre>git clone https://github.com/mje07/felt
+cd felt
+flutter build linux --release</pre>
+        <a class="pill secondary" href="https://github.com/mje07/felt#develop">Build instructions</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Felt · Made with Flutter · Inter typeface under the SIL Open Font License</span>
+    <span><a href="https://github.com/mje07/felt">Source on GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+  // Fade sections in as they scroll into view.
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window)) { els.forEach(function (e) { e.classList.add('in'); }); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0 });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+</script>
+</body>
+</html>
